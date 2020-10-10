@@ -42,6 +42,8 @@ matplotlib.rcParams['text.usetex'] = True
 matplotlib.rcParams['font.family'] = 'serif'
 import matplotlib.pyplot as plt
 
+from Utils.dataTools import invertTensorEW
+
 zeroTolerance = 1e-9 # Values below this number are considered zero.
 
 # If adjacency matrices are not symmetric these functions might not work as
@@ -55,7 +57,7 @@ def plotGraph(adjacencyMatrix, **kwargs):
     
     Optional keyword arguments:
         'positions' (np.array, default: points in a circle of radius 1):
-                size N x 2 of positions for each node
+                size 2 x N of positions for each node
         'figSize' (int, default: 5): size of the figure
         'linewidth' (int, default: 1): edge width
         'markerSize' (int, default: 15): node size
@@ -684,7 +686,8 @@ def createGraph(graphType, N, graphOptions):
     createGraph: creates a graph of a specified type
     
     Input:
-        graphType (string): 'SBM', 'SmallWorld', 'fuseEdges', and 'adjacency'
+        graphType (string): 'ER', 'SBM', 'SmallWorld', 'geometric', 'fuseEdges',
+            and 'adjacency'
         N (int): Number of nodes
         graphOptions (dict): Depends on the type selected.
         Obs.: More types to come.
@@ -693,6 +696,8 @@ def createGraph(graphType, N, graphOptions):
         W (np.array): adjacency matrix of shape N x N
     
     Optional inputs (by keyword):
+        graphType: 'ER'
+            'probEdge' (float): probability of drawing an edge
         graphType: 'SBM'
             'nCommunities': (int) number of communities
             'probIntra': (float) probability of drawing an edge between nodes
@@ -704,6 +709,24 @@ def createGraph(graphType, N, graphOptions):
             'probEdge': probability of drawing an edge between nodes
             'probRewiring': probability of rewiring an edge
             Obs.: This always results in a connected graph.
+        graphType: 'geometric'
+            'pos': Single element list to return through input arguments the
+                positions of the nodes
+            'kernelType': 'inverse' sets the weights to be the inverse of the
+                euclidean distance d_ij, 'gaussian' sets the weights to be
+                exp(-d_ij^2), 'exponential' sets the weights to be exp(-d_ij).
+                Obs.: No self-loops are considered.
+            'sparseType': 'threshold' sparsify the complete graph by keeping
+                edge weights that are greater than some threshold, 'NN' 
+                sparsify the graph by keeping only a specific number of nearest
+                neighbors.
+            'sparseParam': proportion of mean weight under which edge weights 
+                are set to zero (float, if 'threshold'), number of nearest
+                neighbors to keep (int, if 'NN')
+            'minWeight' (float): rescale weights so that minimum nonzero weight
+                is equal to this value
+            'maxWeight' (float): rescale weights so that maximum nonzero weight
+                is equal to this value
         graphType: 'fuseEdges'
             (Given a collection of adjacency matrices of graphs with the same
             number of nodes, this graph type is a fusion of the edges of the 
@@ -743,8 +766,22 @@ def createGraph(graphType, N, graphOptions):
     """
     # Check
     assert N >= 0
+    
+    if graphType == 'ER':
+        assert 'probEdge' in graphOptions.keys()
+        probEdge = graphOptions['probEdge']
+        
+        connectedGraph = False
+        
+        while not connectedGraph:
+            W = np.random.rand(N,N) < probEdge
+            W = W.astype(np.float)
+            W = np.triu(W, 1)
+            W = W + W.T
+            
+            connectedGraph = isConnected(W)
 
-    if graphType == 'SBM':
+    elif graphType == 'SBM':
         assert(len(graphOptions.keys())) == 3
         C = graphOptions['nCommunities'] # Number of communities
         assert int(C) == C # Check that the number of communities is an integer
@@ -798,6 +835,7 @@ def createGraph(graphType, N, graphOptions):
             W = W + W.T
             # Now let's check that it is connected
             connectedGraph = isConnected(W)
+            
     elif graphType == 'SmallWorld':
         # Function provided by Tuomo Mäki-Marttunen
         # Connectedness introduced by Dr. S. Segarra.
@@ -856,6 +894,72 @@ def createGraph(graphType, N, graphOptions):
             W = W + W.T
             # Check that graph is connected
             connectedGraph = isConnected(W)
+            
+    elif graphType == 'geometric':
+        assert 'pos' in graphOptions.keys()
+        assert 'kernelType' in graphOptions.keys()
+        kernelType = graphOptions['kernelType']
+        assert kernelType == 'inverse' \
+            or kernelType == 'gaussian' \
+            or kernelType == 'exponential'
+        if 'sparseType' in graphOptions.keys():
+            sparseType = graphOptions['sparseType']
+            assert sparseType == 'threshold' \
+                or sparseType == 'NN'
+            assert 'sparseParam' in graphOptions.keys()
+            sparseParam = graphOptions['sparseParam']
+        else:
+            sparseType = None
+            sparseParam = None
+        if 'minWeight' in graphOptions.keys():
+            minWeight = graphOptions['minWeight']
+        else:
+            minWeight = None
+        if 'maxWeight' in graphOptions.keys():
+            maxWeight = graphOptions['maxWeight']
+        else:
+            maxWeight = None
+            
+        connectedGraph = False
+        
+        while not connectedGraph:
+            pos = np.random.rand(N,2) # Random positions in [0,1]^2
+            graphOptions['pos'][0] = pos.T
+            dist = sp.distance.squareform(sp.distance.pdist(pos)) # Distance 
+                # between positions
+            
+            # Choose kernel type
+            if kernelType == 'inverse':
+                S = invertTensorEW(dist)
+            elif kernelType == 'gaussian':
+                S = np.exp(-dist ** 2)
+            elif kernelType == 'exponential':
+                S = np.exp(-dist)
+                
+            # Sparsify
+            if sparseType is not None:
+                # Adapt the threshold value
+                if sparseType == 'threshold':
+                    sparseParam = sparseParam * np.mean(S[S>0])
+                S = sparsifyGraph(S, sparseType, sparseParam)
+            
+            # Rescale
+            minS = np.min(S[S>0])
+            maxS = np.max(S[S>0])
+            if minWeight is None:
+                minWeight = minS
+            if maxWeight is None:
+                maxWeight = maxS
+            aRescale = (maxWeight - minWeight)/(maxS - minS)
+            bRescale = minWeight - aRescale * minS
+            W = (aRescale * S + bRescale) * (S>0).astype(S.dtype)
+                
+            # Get rid of self-loops
+            W = W - np.diag(np.diag(W))
+            
+            # Check if connected
+            connectedGraph = isConnected(W)
+        
     elif graphType == 'fuseEdges':
         # This alternative assumes that there are multiple graphs that have to
         # be fused into one.
@@ -1196,7 +1300,8 @@ class Graph():
 
     Initialization:
 
-        graphType (string): 'SBM', 'SmallWorld', 'fuseEdges', and 'adjacency'
+        graphType (string): 'ER', 'SBM', 'SmallWorld', 'geometric', 'fuseEdges',
+            and 'adjacency'
         N (int): number of nodes
         [optionalArguments]: related to the specific type of graph; see
             createGraph() for details.

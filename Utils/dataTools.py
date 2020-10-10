@@ -214,26 +214,26 @@ class _data:
         return x, y
     
     def expandDims(self):
-        
         # For each data set partition
         for key in self.samples.keys():
-            # If there's something in them
-            if self.samples[key]['signals'] is not None:
-                # And if it has only two dimensions
-                #   (shape: nDataPoints x nNodes)
-                if len(self.samples[key]['signals'].shape) == 2:
-                    # Then add a third dimension in between so that it ends
-                    # up with shape
-                    #   nDataPoints x 1 x nNodes
-                    # and it respects the 3-dimensional format that is taken
-                    # by many of the processing functions
-                    if 'torch' in repr(self.dataType):
-                        self.samples[key]['signals'] = \
-                                       self.samples[key]['signals'].unsqueeze(1)
-                    else:
-                        self.samples[key]['signals'] = np.expand_dims(
-                                                   self.samples[key]['signals'],
-                                                   axis = 1)
+            for dataKey in ['signals', 'targets']: 
+                # If there's something in them
+                if self.samples[key][dataKey] is not None:
+                    # And if it has only two dimensions
+                    #   (shape: nDataPoints x nNodes)
+                    if len(self.samples[key][dataKey].shape) == 2:
+                        # Then add a third dimension in between so that it ends
+                        # up with shape
+                        #   nDataPoints x 1 x nNodes
+                        # and it respects the 3-dimensional format that is taken
+                        # by many of the processing functions
+                        if 'torch' in repr(self.dataType):
+                            self.samples[key][dataKey] = \
+                                           self.samples[key][dataKey].unsqueeze(1)
+                        else:
+                            self.samples[key][dataKey] = np.expand_dims(
+                                                       self.samples[key][dataKey],
+                                                       axis = 1)
         
     def astype(self, dataType):
         # This changes the type for the minimal attributes (samples). This 
@@ -326,6 +326,46 @@ class _dataForClassification(_data):
             errorRate = totalErrors.astype(self.dataType)/N
         #   And from that, compute the accuracy
         return errorRate
+
+class Wireless(_data):
+    def __init__(self, G, nTrain, nValid, nTest,
+                       dataType = np.float64, device = 'cpu'):
+        super().__init__()
+        self.dataType = dataType
+        self.device = device
+        self.nTrain = nTrain
+        self.nValid = nValid
+        self.nTest = nTest
+        
+        EW, VW = graph.computeGFT(G.W, order = 'totalVariation')
+        eMax = np.max(np.abs(EW))
+        # Normalize the matrix so that it doesn't explode
+        Wnorm = G.W / eMax
+
+        # total number of samples
+        nTotal = nTrain + nValid + nTest
+
+        signals = np.random.rand(nTotal, G.N)
+
+        self.samples['train']['signals'] = signals[0:nTrain, :]
+        self.samples['train']['targets'] = signals[0:nTrain, :]
+        self.samples['valid']['signals'] = signals[nTrain:nTrain+nValid, :]
+        self.samples['valid']['targets'] = signals[nTrain:nTrain+nValid, :]
+        self.samples['test']['signals'] = signals[nTrain+nValid:nTotal, :]
+        self.samples['test']['targets'] = signals[nTrain+nValid:nTotal, :]
+        # Change data to specified type and device
+        self.astype(self.dataType)
+
+    def evaluate(self, yHat, y, tol = 1e-9):
+        # Now, we compute the RMS
+        if 'torch' in repr(self.dataType):
+            mse = torch.nn.functional.mse_loss(yHat, y)
+            rmse = torch.sqrt(mse)
+        else:
+            mse = np.mean((yHat - y) ** 2) 
+            rmse = np.sqrt(mse)
+
+        return rmse
         
 class FacebookEgo:
     """
@@ -690,7 +730,6 @@ class Authorship(_dataForClassification):
             tol (float): numerical tolerance to consider two numbers to be equal
         Output:
             errorRate (float): proportion of incorrect labels
-
     """
     
     def __init__(self, authorName, ratioTrain, ratioValid, dataPath,
