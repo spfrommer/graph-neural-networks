@@ -345,14 +345,15 @@ class Wireless(_data):
         # total number of samples
         nTotal = nTrain + nValid + nTest
 
-        signals = np.random.rand(nTotal, G.N)
+        signals = (np.random.rand(nTotal, G.N) - 0.5) * 2
+        targets = np.tanh(10 * signals @ Wnorm)
 
         self.samples['train']['signals'] = signals[0:nTrain, :]
-        self.samples['train']['targets'] = signals[0:nTrain, :]
+        self.samples['train']['targets'] = targets[0:nTrain, :]
         self.samples['valid']['signals'] = signals[nTrain:nTrain+nValid, :]
-        self.samples['valid']['targets'] = signals[nTrain:nTrain+nValid, :]
+        self.samples['valid']['targets'] = targets[nTrain:nTrain+nValid, :]
         self.samples['test']['signals'] = signals[nTrain+nValid:nTotal, :]
-        self.samples['test']['targets'] = signals[nTrain+nValid:nTotal, :]
+        self.samples['test']['targets'] = targets[nTrain+nValid:nTotal, :]
         # Change data to specified type and device
         self.astype(self.dataType)
 

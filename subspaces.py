@@ -708,7 +708,7 @@ for graph in range(nGraphRealizations):
             # the corresponding error.
             
             if doPrint:
-                print("\t%s: %6.4f%% [Best] %6.4f%% [Last]" % (thisModel,
+                print("\t%s: %6.4f [Best] %6.4f [Last]" % (thisModel,
                                                                thisCostBest,
                                                                thisCostLast))
 
@@ -754,7 +754,7 @@ for thisModel in modelList:
 
     # And print it:
     if doPrint:
-        print("\t%s: %6.4f%% (+-%6.4f%%) [Best] %6.4f%% (+-%6.4f%%) [Last]" % (
+        print("\t%s: %6.4f (+-%6.4f) [Best] %6.4f (+-%6.4f) [Last]" % (
                 thisModel,
                 meanCostBest[thisModel],
                 stdDevCostBest[thisModel],
@@ -772,7 +772,7 @@ with open(varsFile, 'a+') as file:
     file.write("Final evaluations (%02d graphs, %02d realizations)\n" % (
             nGraphRealizations, nDataRealizations))
     for thisModel in modelList:
-        file.write("\t%s: %6.4f%% (+-%6.4f%%) [Best] %6.4f%% (+-%6.4f%%) [Last]\n" % (
+        file.write("\t%s: %6.4f (+-%6.4f) [Best] %6.4f (+-%6.4f) [Last]\n" % (
                    thisModel,
                    meanCostBest[thisModel],
                    stdDevCostBest[thisModel],
