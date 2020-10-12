@@ -328,7 +328,7 @@ class _dataForClassification(_data):
         return errorRate
 
 class Wireless(_data):
-    def __init__(self, G, nTrain, nValid, nTest,
+    def __init__(self, G, kCutoff, nTrain, nValid, nTest,
                        dataType = np.float64, device = 'cpu'):
         super().__init__()
         self.dataType = dataType
@@ -337,7 +337,9 @@ class Wireless(_data):
         self.nValid = nValid
         self.nTest = nTest
         
+        # VW has eigenvectors as columns
         EW, VW = graph.computeGFT(G.W, order = 'totalVariation')
+        VWHigh = VW[:, kCutoff:] # Only get high eigenvalue eigenvectors
         eMax = np.max(np.abs(EW))
         # Normalize the matrix so that it doesn't explode
         Wnorm = G.W / eMax
@@ -346,6 +348,7 @@ class Wireless(_data):
         nTotal = nTrain + nValid + nTest
 
         signals = (np.random.rand(nTotal, G.N) - 0.5) * 2
+        signals = (VWHigh @ VWHigh.T @ signals.T).T # Project onto high eigenvalues
         targets = np.tanh(10 * signals @ Wnorm)
 
         self.samples['train']['signals'] = signals[0:nTrain, :]

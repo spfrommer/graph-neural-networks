@@ -124,6 +124,7 @@ nGraphRealizations = 3 # Number of graph realizations
 nClasses = 5 # Number of source nodes to select
 
 nNodes = 100 # Number of nodes
+kCutoff = 75 # Cutoff for "high-frequency" eigenvalues
 graphOptions = {} # Dictionary of options to pass to the createGraph function
 if graphType == 'SBM':
     graphOptions['nCommunities'] = nClasses # Number of communities
@@ -466,7 +467,7 @@ for graph in range(nGraphRealizations):
         #   can go ahead and generate the datasets.
         # data = Utils.dataTools.SourceLocalization(G, nTrain, nValid, nTest,
                                                   # sourceNodes, tMax = tMax)
-        data = Utils.dataTools.Wireless(G, nTrain, nValid, nTest)
+        data = Utils.dataTools.Wireless(G, kCutoff, nTrain, nValid, nTest)
         data.astype(torch.float64)
         #data.to(device)
         data.expandDims() # Data are just graph signals, but the architectures 
