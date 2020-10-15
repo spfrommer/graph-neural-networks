@@ -328,7 +328,7 @@ class _dataForClassification(_data):
         return errorRate
 
 class Wireless(_data):
-    def __init__(self, G, kCutoff, nTrain, nValid, nTest,
+    def __init__(self, G, kLow, kHigh, nTrain, nValid, nTest,
                        dataType = np.float64, device = 'cpu'):
         super().__init__()
         self.dataType = dataType
@@ -337,19 +337,28 @@ class Wireless(_data):
         self.nValid = nValid
         self.nTest = nTest
         
-        # VW has eigenvectors as columns
-        EW, VW = graph.computeGFT(G.W, order = 'totalVariation')
-        VWHigh = VW[:, kCutoff:] # Only get high eigenvalue eigenvectors
-        eMax = np.max(np.abs(EW))
+        # LW has eigenvectors as columns
+        # Last eigenvector is lowest frequency (constant)
+        EL, VL = graph.computeGFT(G.L, order = 'totalVariation')
+        VLHigh = VL[:, kLow:kHigh] # Only get high eigenvalue eigenvectors
+        #VLHigh = VL[:, kCutoff:] # Only get high eigenvalue eigenvectors
+        eMax = np.max(np.abs(EL))
         # Normalize the matrix so that it doesn't explode
-        Wnorm = G.W / eMax
+        Lnorm = G.L / eMax
 
         # total number of samples
         nTotal = nTrain + nValid + nTest
 
-        signals = (np.random.rand(nTotal, G.N) - 0.5) * 2
-        signals = (VWHigh @ VWHigh.T @ signals.T).T # Project onto high eigenvalues
-        targets = np.tanh(10 * signals @ Wnorm)
+        #signals = (np.random.rand(nTotal, G.N) - 0.5) * 2 # Do gaussian
+        signals = np.random.normal(0.0, 1.0, size=(nTotal, G.N))
+
+        signals = (VLHigh @ VLHigh.T @ signals.T).T # Project onto high eigenvalues
+        signals = signals @ Lnorm;
+        norms = np.sqrt((signals * signals).sum(axis=1))
+        signals = signals / norms.reshape(signals.shape[0], 1)
+        #targets = 1/(1 + np.exp(signals))
+        #import pdb; pdb.set_trace()
+        targets = np.tanh(50 * signals) # Lower to 3 or 5
 
         self.samples['train']['signals'] = signals[0:nTrain, :]
         self.samples['train']['targets'] = targets[0:nTrain, :]
@@ -361,15 +370,20 @@ class Wireless(_data):
         self.astype(self.dataType)
 
     def evaluate(self, yHat, y, tol = 1e-9):
+        # if yHat.shape != y.shape:
+            # y = y.squeeze(1)
+        y = y.squeeze()
+        yHat = yHat.squeeze()
         # Now, we compute the RMS
         if 'torch' in repr(self.dataType):
+            #assert yHat.shape == y.shape
             mse = torch.nn.functional.mse_loss(yHat, y)
             rmse = torch.sqrt(mse)
         else:
             mse = np.mean((yHat - y) ** 2) 
             rmse = np.sqrt(mse)
 
-        return rmse
+        return mse
         
 class FacebookEgo:
     """

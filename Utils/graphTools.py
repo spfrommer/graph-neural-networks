@@ -1367,9 +1367,10 @@ class Graph():
             self.L = adjacencyToLaplacian(self.W)
         else:
             self.L = None
-        #\\\ GSO (Graph Shift Operator):
+        # GSO (Graph Shift Operator):
         #   The weighted adjacency matrix by default
-        self.S = self.W
+        #self.S = self.W
+        self.S = self.L
         #\\\ GFT: Declare variables but do not compute it unless specifically
         # requested
         self.E = None # Eigenvalues

@@ -119,12 +119,12 @@ nValid = int(0.025 * nTrain) # Number of validation samples
 nTest = 200 # Number of testing samples
 tMax = 25 # Maximum number of diffusion times (A^t for t < tMax)
 
-nDataRealizations = 3 # Number of data realizations
+nDataRealizations = 1 # Number of data realizations
 nGraphRealizations = 3 # Number of graph realizations
 nClasses = 5 # Number of source nodes to select
 
-nNodes = 100 # Number of nodes
-kCutoff = 75 # Cutoff for "high-frequency" eigenvalues
+nNodes = 50 # Number of nodes
+kCutoff = 40 # Cutoff for "high-frequency" eigenvalues
 graphOptions = {} # Dictionary of options to pass to the createGraph function
 if graphType == 'SBM':
     graphOptions['nCommunities'] = nClasses # Number of communities
@@ -191,7 +191,7 @@ writeVarValues(varsFile,
 #################
 
 # Select desired architectures
-doFilter = True
+doFilter = True 
 doLocalGNN = True
 
 # In this section, we determine the (hyper)parameters of models that we are
@@ -215,7 +215,6 @@ modelList = []
 #\\\\\\\\\\\\\\\\\\\\\
 
 if doFilter:
-    
     #\\\ Basic parameters for all the Local GNN architectures
     
     modelFilter = {}
@@ -229,7 +228,7 @@ if doFilter:
     # Select architectural nn.Module to use
     modelFilter['archit'] = archit.LocalGNN
     # Graph convolutional layers
-    modelFilter['dimNodeSignals'] = [1, 1] # Number of features per layer
+    modelFilter['dimNodeSignals'] = [1, 32] # Number of features per layer
     modelFilter['nFilterTaps'] = [3] # Number of filter taps
     modelFilter['bias'] = True # Include bias
     # Nonlinearity
@@ -272,21 +271,23 @@ if doLocalGNN:
         
     # Select architectural nn.Module to use
     modelLocalGNN['archit'] = archit.LocalGNN
+    # modelLocalGNN['archit'] = archit.SpectralGNN
     # Graph convolutional layers
-    modelLocalGNN['dimNodeSignals'] = [1, 32, 32] # Number of features per layer
-    modelLocalGNN['nFilterTaps'] = [3, 3] # Number of filter taps
+    modelLocalGNN['dimNodeSignals'] = [1, 32] # Number of features per layer
+    modelLocalGNN['nFilterTaps'] = [3] # Number of filter taps
+    # modelLocalGNN['nCoeff'] = [nNodes, nNodes] # Number of spectral coefficients
     modelLocalGNN['bias'] = True # Include bias
     # Nonlinearity
     modelLocalGNN['nonlinearity'] = nn.Tanh
     # Pooling
     modelLocalGNN['poolingFunction'] = gml.NoPool # Summarizing function
-    modelLocalGNN['nSelectedNodes'] = [nNodes, nNodes]
+    modelLocalGNN['nSelectedNodes'] = [nNodes]
     # modelLocalGNN['nSelectedNodes'] = None 
-    modelLocalGNN['poolingSize'] = [1, 1] # poolingSize-hop neighborhood that
+    modelLocalGNN['poolingSize'] = [1] # poolingSize-hop neighborhood that
                                         # is affected by the summary
     # Readout layer
-    # modelLocalGNN['dimReadout'] = []
     modelLocalGNN['dimReadout'] = [1]
+    # modelLocalGNN['dimLayersMLP'] = [nNodes]
     # Graph Structure
     modelLocalGNN['GSO'] = None # To be determined later on, based on data
     modelLocalGNN['order'] = None
@@ -467,7 +468,8 @@ for graph in range(nGraphRealizations):
         #   can go ahead and generate the datasets.
         # data = Utils.dataTools.SourceLocalization(G, nTrain, nValid, nTest,
                                                   # sourceNodes, tMax = tMax)
-        data = Utils.dataTools.Wireless(G, kCutoff, nTrain, nValid, nTest)
+        # data = Utils.dataTools.Wireless(G, kCutoff, nTrain, nValid, nTest)
+        data = Utils.dataTools.Wireless(G, 30, 50, nTrain, nValid, nTest)
         data.astype(torch.float64)
         #data.to(device)
         data.expandDims() # Data are just graph signals, but the architectures 
@@ -541,6 +543,7 @@ for graph in range(nGraphRealizations):
                 EL, VL = graphTools.computeGFT(L, order = 'increasing')
                 S = 2*L/np.max(np.real(EL)) - np.eye(nNodes)
             else:
+                #S = G.S.copy()/np.max(np.real(G.E))
                 S = G.S.copy()/np.max(np.real(G.E))
                 
             modelDict['GSO'] = S
@@ -571,6 +574,10 @@ for graph in range(nGraphRealizations):
             ########
     
             # Initialize the loss function
+            # def thisLossFunction(x,y):
+                # x = x.squeeze()
+                # y = y.squeeze()
+                # return lossFunction()(x,y)
             thisLossFunction = lossFunction()
     
             #########

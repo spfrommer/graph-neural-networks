@@ -23,6 +23,7 @@ import numpy as np
 import os
 import pickle
 import datetime
+from itertools import product
 
 from Utils.dataTools import invertTensorEW
 
@@ -243,9 +244,35 @@ class Trainer:
 
         # Compute loss
         lossValueTrain = self.model.loss(yHatTrain, yTrain)
+        
+        if False:
+            nFilters = 0
+            reg = torch.tensor(0.0, requires_grad=True, device=lossValueTrain.device)
+
+            nCoef = 3
+            evalPoints = torch.linspace(0.5, 1, steps=6, device=lossValueTrain.device)
+            evalPowers = []
+            for n in range(nCoef):
+                evalPowers.append(evalPoints ** n)
+
+            for param in self.model.archit.parameters():
+                if len(param.shape) == 4:
+                    for i,j in product(range(param.shape[0]), range(param.shape[3])):
+                        # Have filter polynomial coefficients
+                        coefs = param[i, :, :, j].squeeze()
+                        responses = torch.zeros_like(evalPoints, device=lossValueTrain.device)
+                        for n, coef in enumerate(coefs):
+                            responses = responses + coef * evalPowers[n]
+                        
+                        reg = reg + (responses - responses[0]).pow(2).sum()
+                        nFilters += 1
+
+            totalLoss = lossValueTrain + 3.0 * reg / nFilters
+        else:
+            totalLoss = lossValueTrain
 
         # Compute gradients
-        lossValueTrain.backward()
+        totalLoss.backward()
 
         # Optimize
         self.model.optim.step()
@@ -262,7 +289,8 @@ class Trainer:
         #   (Alternatively, we could use a with torch.no_grad():)
         costTrain = self.data.evaluate(yHatTrain.data, yTrain)
         
-        return lossValueTrain.item(), costTrain.item(), timeElapsed
+        #return lossValueTrain.item(), costTrain.item(), timeElapsed
+        return totalLoss.item(), costTrain.item(), timeElapsed
     
     def validationStep(self):
         
