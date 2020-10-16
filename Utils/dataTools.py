@@ -340,8 +340,8 @@ class Wireless(_data):
         # LW has eigenvectors as columns
         # Last eigenvector is lowest frequency (constant)
         EL, VL = graph.computeGFT(G.L, order = 'totalVariation')
-        VLHigh = VL[:, kLow:kHigh] # Only get high eigenvalue eigenvectors
-        #VLHigh = VL[:, kCutoff:] # Only get high eigenvalue eigenvectors
+        nNodes = VL.shape[0]
+        VLHigh = VL[:, (nNodes - kHigh):(nNodes - kLow)]
         eMax = np.max(np.abs(EL))
         # Normalize the matrix so that it doesn't explode
         Lnorm = G.L / eMax
@@ -356,9 +356,9 @@ class Wireless(_data):
         signals = signals @ Lnorm;
         norms = np.sqrt((signals * signals).sum(axis=1))
         signals = signals / norms.reshape(signals.shape[0], 1)
-        #targets = 1/(1 + np.exp(signals))
+        #targets = 1/(1 + np.exp(20 * signals))
         #import pdb; pdb.set_trace()
-        targets = np.tanh(50 * signals) # Lower to 3 or 5
+        targets = np.tanh(20 * signals) # Lower to 3 or 5
 
         self.samples['train']['signals'] = signals[0:nTrain, :]
         self.samples['train']['targets'] = targets[0:nTrain, :]

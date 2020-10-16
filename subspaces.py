@@ -55,6 +55,8 @@ import Modules.loss as loss
 from Utils.miscTools import writeVarValues
 from Utils.miscTools import saveSeed
 
+import argparse
+
 import pdb
 
 # Start measuring time
@@ -66,21 +68,31 @@ startRunTime = datetime.datetime.now()
 #                                                                   #
 #####################################################################
 
-# TODO: implement geometric
+parser = argparse.ArgumentParser()
+parser.add_argument('--N', type=int, default=100)
+parser.add_argument('--kLow', type=int, default=0)
+parser.add_argument('--kHigh', type=int, default=20)
+parser.add_argument('--saveDir', type=str, default='')
+args = parser.parse_args()
+
 graphType = 'geometric' # Type of graph: 'SBM', 'SmallWorld', 'geometric'
 
-thisFilename = 'subspaces' # This is the general name of all related files
+if args.saveDir != '': 
+    saveDir = args.saveDir
+else:
+    thisFilename = 'subspaces' # This is the general name of all related files
 
-saveDirRoot = 'experiments' # In this case, relative location
-saveDir = os.path.join(saveDirRoot, thisFilename) # Dir where to save all
+    saveDirRoot = 'experiments' # In this case, relative location
+    saveDir = os.path.join(saveDirRoot, thisFilename) # Dir where to save all
     # the results from each run
 
-#\\\ Create .txt to store the values of the setting parameters for easier
-# reference when running multiple experiments
-today = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
-# Append date and time of the run to the directory, to avoid several runs of
-# overwritting each other.
-saveDir = saveDir + '-' + graphType + '-' + today
+    #\\\ Create .txt to store the values of the setting parameters for easier
+    # reference when running multiple experiments
+    today = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+    # Append date and time of the run to the directory, to avoid several runs of
+    # overwritting each other.
+    saveDir = saveDir + '-' + graphType + '-' + today
+
 # Create directory
 if not os.path.exists(saveDir):
     os.makedirs(saveDir)
@@ -120,11 +132,10 @@ nTest = 200 # Number of testing samples
 tMax = 25 # Maximum number of diffusion times (A^t for t < tMax)
 
 nDataRealizations = 1 # Number of data realizations
-nGraphRealizations = 3 # Number of graph realizations
+nGraphRealizations = 2 # Number of graph realizations
 nClasses = 5 # Number of source nodes to select
 
-nNodes = 50 # Number of nodes
-kCutoff = 40 # Cutoff for "high-frequency" eigenvalues
+nNodes = args.N # Number of nodes
 graphOptions = {} # Dictionary of options to pass to the createGraph function
 if graphType == 'SBM':
     graphOptions['nCommunities'] = nClasses # Number of communities
@@ -466,11 +477,8 @@ for graph in range(nGraphRealizations):
 
         #   Now that we have the list of nodes we are using as sources, then we
         #   can go ahead and generate the datasets.
-        # data = Utils.dataTools.SourceLocalization(G, nTrain, nValid, nTest,
-                                                  # sourceNodes, tMax = tMax)
-        # data = Utils.dataTools.Wireless(G, kCutoff, nTrain, nValid, nTest)
-        data = Utils.dataTools.Wireless(G, 0, 10, nTrain, nValid, nTest) # High freq
-        #data = Utils.dataTools.Wireless(G, 10, 50, nTrain, nValid, nTest) # Low freq
+        data = Utils.dataTools.Wireless(G, args.kLow, args.kHigh,
+                                        nTrain, nValid, nTest)
         data.astype(torch.float64)
         #data.to(device)
         data.expandDims() # Data are just graph signals, but the architectures 
