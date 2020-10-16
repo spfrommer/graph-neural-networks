@@ -269,46 +269,79 @@ def normalizeLaplacian(L):
     # Return the Normalized Laplacian
     return D @ L @ D
 
-def computeGFT(S, order = 'no'):
+def computeGFT(S, order = 'no', doMatrix = True):
     """
     computeGFT: Computes the frequency basis (eigenvectors) and frequency
-        coefficients (eigenvalues) of a given GSO
+        coefficients (eigenvalues) of a given (collection of) GSO
 
     Input:
 
-        S (np.array): graph shift operator matrix
+        S (np.array): (collection of) graph shift operator matrix; shape
+            (E x) N x N
         order (string): 'no', 'increasing', 'totalVariation' chosen order of
             frequency coefficients (default: 'no')
+        doMatrix (bool): if True output the eigenvalues as a diagonal matrix
+            (default: True)
 
     Output:
 
-        E (np.array): diagonal matrix with the frequency coefficients
-            (eigenvalues) in the diagonal
-        V (np.array): matrix with frequency basis (eigenvectors)
+        E (np.array): (collection of) diagonal matrix with the frequency 
+            coefficients (eigenvalues) in the diagonal; shape
+            (E x) N x N
+        V (np.array): (collection of) matrix with frequency basis (eigenvectors)
+            (E x) x N x N
     """
     # Check the correct order input
     assert order == 'totalVariation' or order == 'no' or order == 'increasing'
-    # Check the matrix is square
-    assert S.shape[0] == S.shape[1]
-    # Check if it is symmetric
-    symmetric = np.allclose(S, S.T, atol = zeroTolerance)
-    # Then, compute eigenvalues and eigenvectors
-    if symmetric:
-        e, V = np.linalg.eigh(S)
+    # Check if we have a collection of matrices or a single one
+    assert len(S.shape) == 2 or len(S.shape) == 3
+    if len(S.shape) == 2:
+        N = S.shape[0]
+        assert S.shape[1] == N
+        E = 1
+        S = S.reshape(1, N, N)
+        scalarWeights = True
+    elif len(S.shape) == 3:
+        E = S.shape[0]
+        N = S.shape[1]
+        assert S.shape[2] == N
+        scalarWeights = False
+    
+    # Where to store the eigendecomposition
+    if doMatrix:
+        L = np.zeros((E, N, N))
     else:
-        e, V = np.linalg.eig(S)
-    # Sort the eigenvalues by the desired error:
-    if order == 'totalVariation':
-        eMax = np.max(e)
-        sortIndex = np.argsort(np.abs(e - eMax))
-    elif order == 'increasing':
-        sortIndex = np.argsort(np.abs(e))
-    else:
-        sortIndex = np.arange(0, S.shape[0])
-    e = e[sortIndex]
-    V = V[:, sortIndex]
-    E = np.diag(e)
-    return E, V
+        L = np.zeros((E, N))
+    V = np.zeros((E, N, N))
+    
+    for e in range(E):
+        # Check if it is symmetric
+        symmetric = np.allclose(S[e], S[e].T, atol = zeroTolerance)
+        # Then, compute eigenvalues and eigenvectors
+        if symmetric:
+            le, Ve = np.linalg.eigh(S[e])
+        else:
+            le, Ve = np.linalg.eig(S[e])
+        # Sort the eigenvalues by the desired error:
+        if order == 'totalVariation':
+            leMax = np.max(le)
+            sortIndex = np.argsort(np.abs(le - leMax))
+        elif order == 'increasing':
+            sortIndex = np.argsort(np.abs(le))
+        else:
+            sortIndex = np.arange(0, N)
+        le = le[sortIndex]
+        V[e] = Ve[:, sortIndex]
+        if doMatrix:
+            L[e] = np.diag(le)
+        else:
+            L[e] = le
+        
+    if scalarWeights:
+        V = V.squeeze(0)
+        L = L.squeeze(0)
+        
+    return L, V
 
 def matrixPowers(S,K):
     """
@@ -347,6 +380,43 @@ def matrixPowers(S,K):
         SK = SK.reshape(K, N, N)
 
     return SK
+
+def vectorPowers(v,K):
+    """
+    vectorPowers(v, K) Computes the collection of elementwise powers of the
+        vector v
+
+    Inputs:
+        v: either a single N vector or a collection E x N of E vectors.
+        K: integer, maximum power to be computed (up to K-1)
+
+    Outputs:
+        vK: either a collection of K vectors K x N (if the input was a single
+            vector) or a collection E x K x N (if the input was a collection of
+            E vectors).
+    """
+    # S can be either a single GSO (N x N) or a collection of GSOs (E x N x N)
+    if len(v.shape) == 1:
+        N = v.shape[0]
+        E = 1
+        v = v.reshape(1, N)
+        scalarWeights = True
+    elif len(v.shape) == 2:
+        E = v.shape[0]
+        N = v.shape[1]
+        scalarWeights = False
+
+    # Now, let's build the powers of V:
+    thisvK = np.ones((E,N))
+    vK = thisvK.reshape(E, 1, N)
+    for k in range(1,K):
+        thisvK = thisvK * v
+        vK = np.concatenate((vK, thisvK.reshape(E, 1, N)), axis = 1)
+    # Take out the first dimension if it was a single GSO
+    if scalarWeights:
+        vK = vK.reshape(K, N)
+
+    return vK
 
 def computeNonzeroRows(S, Nl = 'all'):
     """

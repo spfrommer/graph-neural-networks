@@ -244,7 +244,8 @@ class Trainer:
 
         # Compute loss
         lossValueTrain = self.model.loss(yHatTrain, yTrain)
-        
+
+
         if False:
             nFilters = 0
             reg = torch.tensor(0.0, requires_grad=True, device=lossValueTrain.device)
@@ -268,6 +269,8 @@ class Trainer:
                         nFilters += 1
 
             totalLoss = lossValueTrain + 3.0 * reg / nFilters
+        elif True:
+            totalLoss = lossValueTrain + 0.5 * self.model.archit.ILconstant()
         else:
             totalLoss = lossValueTrain
 

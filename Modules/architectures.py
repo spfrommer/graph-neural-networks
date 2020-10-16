@@ -903,6 +903,9 @@ class LocalGNN(nn.Module):
             of nodes (which just results in disconnected nodes), then we might
             want to update the nSelectedNodes and poolingSize accordingly, if
             the size of the new GSO is different.
+        
+        C = .ILconstant(): computes the integral Lipschitz constant of the 
+            architecture
             
         y, yGNN = .splitForward(x): gives the output of the entire GNN y,
         which is of shape batchSize x dimReadout[-1], as well as the output
@@ -967,6 +970,10 @@ class LocalGNN(nn.Module):
         self.S, self.order = self.permFunction(GSO)
         if 'torch' not in repr(self.S.dtype):
             self.S = torch.tensor(self.S)
+        self.eigenvalues = None # No set of eigenvalues saved yet, we will only
+            # compute the eigenvalues if we need them
+        self.eigenvaluesPowers = None # Variable to save the power of the
+            # eigenvalues
         self.alpha = poolingSize
         self.N = [GSO.shape[1]] + nSelectedNodes # Number of nodes
         # See that we adding N_{0} = N as the number of nodes input the first
@@ -1046,6 +1053,9 @@ class LocalGNN(nn.Module):
         self.S = changeDataType(self.S, dataType)
         if device is not None:
             self.S = self.S.to(device)
+        # And reset the eigenvalues
+        self.eigenvalues = None
+        self.eigenvaluesPowers = None
             
         # Before making decisions, check if there is a new poolingSize list
         if len(poolingSize) > 0:
@@ -1081,6 +1091,178 @@ class LocalGNN(nn.Module):
         # And update in the LSIGF that is still missing
         for l in range(self.L):
             self.GFL[3*l].addGSO(self.S) # Graph convolutional layer
+            
+    def _computeEigenvalues(self):
+        
+        # It will have shape E x N
+        #   Obtain the eigenvalues
+        eigenvalues, _ = Utils.graphTools.computeGFT(
+                                                  self.S.data.cpu().numpy(),
+                                                  order = 'no',
+                                                  doMatrix = False)
+        #   And put them back to being torch (E x N)
+        self.eigenvalues = torch.tensor(eigenvalues, device = self.S.device)
+        #   And now compute the eigenvalue powers
+        eigenvaluesPowers = Utils.graphTools.vectorPowers(eigenvalues,
+                                                         max(self.K))
+        #   Finally, move it back to tensor (E x K x N)
+        self.eigenvaluesPowers = torch.tensor(eigenvaluesPowers,
+                                             device = self.S.device)
+        
+    def getFilters(self, nSamples = 200):
+        # Get the frequency response of the filters
+        
+        if self.eigenvalues is None:
+            # If we don't have the eigenvalues stored, compute them
+            self._computeEigenvalues()
+            
+        E = self.eigenvalues.shape[0]
+        
+        # It will all be implemented in numpy because it's just plotting
+        
+        t = np.zeros((E, nSamples))
+        
+        for e in range(E):
+            # Let's do it evenly spaced between the min value and the max value
+            tmin = np.min(self.eigenvalues[e].data.cpu().numpy())
+            tmax = np.max(self.eigenvalues[e].data.cpu().numpy())
+            t[e] = np.linspace(tmin, tmax, num = nSamples)
+        tPowers = Utils.graphTools.vectorPowers(t, max(self.K))
+        
+        filtersFrequencyResponse = {}
+        
+        l = 0 # Layer counter
+        
+        # For each parameter,
+        for param in self.parameters():
+            # Check it has dimension 4 (it is the filter taps)
+            if len(param.shape) == 4:
+                # Check if the dimensions coincide, the param has to have
+                # Fl x E x Kl x Gl
+                # where Fl, Gl and Kl change with each layer l, but E is fixed
+                assert param.shape[0] == self.F[l+1] # F
+                assert param.shape[1] == E           # E
+                assert param.shape[2] == self.K[l]   # K
+                assert param.shape[3] == self.F[l]   # G
+                Fl = param.shape[0]
+                Kl = param.shape[2]
+                Gl = param.shape[3]
+                # Now that we know that we have the right parameter, we move
+                # it to numpy
+                h = param.data.cpu().numpy()
+                # We need to multiply it with the eigenvalues that have shape
+                # E x K x nSamples
+                # So we reshape it to be
+                h = h.reshape([Fl, E, Kl, Gl, 1])
+                #   F x E x K x G x 1
+                h = np.tile(h, (1, 1, 1, 1, nSamples))
+                #   F x E x K x G x nSamples
+                # Now we need to multiply this with the eigenvalues to build
+                # the polynomial
+                ht = h * tPowers[:,0:Kl,:].reshape(1, E, Kl, 1, nSamples)
+                #   F x E x K x G x nSamples
+                # And add up over the k dimension to get all the filters
+                ht = np.sum(ht, axis = 2) # F x E x G x nSamples
+                # Save it to return them
+                filtersFrequencyResponse[l] = ht
+                # And increase the number of layers
+                l = l + 1
+                
+        return filtersFrequencyResponse, t
+            
+    def ILconstant(self):
+        
+        E = self.S.shape[0]
+        N = self.S.shape[1]
+        
+        if self.eigenvalues is None:
+            # If we don't have eigenvalues stored, compute them
+            self._computeEigenvalues()
+        
+        # Let's move onto each parameter
+        l = 0 # Layer counter
+        ILconstant = torch.empty(0).to(self.eigenvalues.device) 
+            # Initial value for the IL penalty
+        # For each parameter,
+        for param in self.parameters():
+            # Check it has dimension 4 (it is the filter taps)
+            if len(param.shape) == 4:
+                # Check if the dimensions coincide, the param has to have
+                # Fl x E x Kl x Gl
+                # where Fl, Gl and Kl change with each layer l, but E is fixed
+                assert param.shape[0] == self.F[l+1] # F
+                assert param.shape[1] == E           # E
+                assert param.shape[2] == self.K[l]   # K
+                assert param.shape[3] == self.F[l]   # G
+                Fl = param.shape[0]
+                Kl = param.shape[2]
+                Gl = param.shape[3]
+                # We will do elementwise multiplication between the filter taps
+                # and the eigenvalue, and then sum up through the k dimension
+                # to compute the derivative.
+                # The derivative is sum_{k=1}^{K-1} k h_{k} lambda^{k-1} so we
+                # need to start counting on k=1 for the filter taps, and go only
+                # up to all but the last element for lambda.
+                
+                # So first, get rid of the first element along the k dimension
+                # of the filters
+                param = torch.narrow(param, 2, 1, Kl-1)
+                #   Fl x E x (Kl-1) x Gl
+                #   We use narrow because it shares the same storage, so it
+                #   doesn't overwhelm the GPU memory
+                # We adapt it to multiplication with the eigenvalues
+                param = param.reshape([Fl, E, Kl-1, Gl, 1])
+                #   Fl x E x (Kl-1) x Gl x 1
+                # Repeat it the length of the eigenvalues
+                param = param.repeat([1, 1, 1, 1, N])
+                #   Fl x E x (Kl-1) x Gl x N
+                
+                # Now we prepare the eigenvalue powers
+                eigPowers = self.eigenvaluesPowers[:, 0:Kl-1, :]
+                #   E x (Kl-1) x N
+                # We just got all but the last eigenvalue power
+                eigPowers = eigPowers.reshape(1, E, Kl-1, 1, N)
+                #   1 x E x (Kl-1) x 1 x N
+                # So now it's ready and in shape for multiplication
+                
+                # And finally we need the value of k that increased from 1 to
+                # Kl-1
+                kLinear = torch.arange(1, Kl,
+                                       device = param.device, dtype = param.dtype)
+                kLinear = kLinear.reshape(1, 1, Kl-1, 1, 1)
+                #   1 x 1 x (Kl-1) x 1 x 1
+                
+                # And now we are ready to build the derivative
+                hPrime = kLinear * param * eigPowers
+                #   h'(lambda): Derivative of h
+                #   Fl x E x (Kl-1) x Gl x N
+                # And add up along the k dimension
+                hPrime = torch.sum(hPrime, dim = 2)
+                #   Fl x E x Gl x N
+                
+                # Now, we need to multiply h'(lambda) with lambda.
+                # The eigenvalues have shape E x N
+                # hPrime has shape Fl x E x Gl x N
+                # So we need to reshape the eigenvalues
+                thisILconstant = self.eigenvalues.reshape([1, E, 1, N]) * hPrime
+                #   Fl x E x Gl x N
+                
+                # Apply torch.abs and torch.max over the nSamples dimension
+                # (second argument are the positions of the maximum, which we 
+                # don't care about).
+                thisILconstant, _ = torch.max(torch.abs(thisILconstant), dim=3)
+                #   Fl x E x Gl
+                # This torch.max does not have a second argument because it is
+                # the maximum of all the numbers
+                thisILconstant = torch.max(thisILconstant)
+                # Add the constant to the list
+                ILconstant = torch.cat((ILconstant,thisILconstant.unsqueeze(0)))
+                # And increase the number of layers
+                l = l + 1
+        
+        # After we computed the IL constant for each layer, we pick the
+        # maximum and go with that
+        return torch.max(ILconstant)
 
     def splitForward(self, x):
 
@@ -1178,6 +1360,11 @@ class LocalGNN(nn.Module):
         for l in range(self.L):
             self.GFL[3*l].addGSO(self.S)
             self.GFL[3*l+2].addGSO(self.S)
+        # Move the eigenvalues if they are there
+        if self.eigenvalues is not None:
+            self.eigenvalues = self.eigenvalues.to(device)
+        if self.eigenvaluesPowers is not None:
+            self.eigenvaluesPowers = self.eigenvaluesPowers.to(device)
 
 class SpectralGNN(nn.Module):
     """

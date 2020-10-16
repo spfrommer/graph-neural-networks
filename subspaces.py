@@ -224,7 +224,7 @@ if doFilter:
                                      else 'cpu'
                                      
     #\\\ ARCHITECTURE
-        
+    
     # Select architectural nn.Module to use
     modelFilter['archit'] = archit.LocalGNN
     # Graph convolutional layers
@@ -469,7 +469,8 @@ for graph in range(nGraphRealizations):
         # data = Utils.dataTools.SourceLocalization(G, nTrain, nValid, nTest,
                                                   # sourceNodes, tMax = tMax)
         # data = Utils.dataTools.Wireless(G, kCutoff, nTrain, nValid, nTest)
-        data = Utils.dataTools.Wireless(G, 30, 50, nTrain, nValid, nTest)
+        data = Utils.dataTools.Wireless(G, 0, 10, nTrain, nValid, nTest) # High freq
+        #data = Utils.dataTools.Wireless(G, 10, 50, nTrain, nValid, nTest) # Low freq
         data.astype(torch.float64)
         #data.to(device)
         data.expandDims() # Data are just graph signals, but the architectures 
