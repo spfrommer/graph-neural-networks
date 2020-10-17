@@ -358,7 +358,7 @@ class Wireless(_data):
         x = signalsDiffused / norms.reshape(signalsDiffused.shape[0], 1)
         
         cutoff = 0.2
-        satslope = 10
+        satslope = 30
         targets = np.piecewise(x,
                 [x < -cutoff, np.logical_and(x >= -cutoff, x < cutoff),
                  x >= cutoff],
