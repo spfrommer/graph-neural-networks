@@ -251,7 +251,7 @@ class Trainer:
             reg = torch.tensor(0.0, requires_grad=True, device=lossValueTrain.device)
 
             nCoef = 3
-            evalPoints = torch.linspace(0.5, 1, steps=6, device=lossValueTrain.device)
+            evalPoints = torch.linspace(0.8, 1, steps=6, device=lossValueTrain.device)
             evalPowers = []
             for n in range(nCoef):
                 evalPowers.append(evalPoints ** n)
@@ -268,9 +268,9 @@ class Trainer:
                         reg = reg + (responses - responses[0]).pow(2).sum()
                         nFilters += 1
 
-            totalLoss = lossValueTrain + 3.0 * reg / nFilters
-        elif False:
-            totalLoss = lossValueTrain + 0.5 * self.model.archit.ILconstant()
+            totalLoss = lossValueTrain + 0.3 * reg / nFilters
+        elif True:
+            totalLoss = lossValueTrain + 0.05 * self.model.archit.ILconstant()
         else:
             totalLoss = lossValueTrain
 

@@ -132,7 +132,7 @@ nTest = 200 # Number of testing samples
 tMax = 25 # Maximum number of diffusion times (A^t for t < tMax)
 
 nDataRealizations = 1 # Number of data realizations
-nGraphRealizations = 2 # Number of graph realizations
+nGraphRealizations = 1 # Number of graph realizations
 nClasses = 5 # Number of source nodes to select
 
 nNodes = args.N # Number of nodes
