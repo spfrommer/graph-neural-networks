@@ -355,10 +355,22 @@ class Wireless(_data):
         signals = (VLHigh @ VLHigh.T @ signals.T).T # Project onto high eigenvalues
         signalsDiffused = signals @ Lnorm;
         norms           = np.sqrt((signalsDiffused * signalsDiffused).sum(axis=1))
-        signalsDiffused = signalsDiffused / norms.reshape(signalsDiffused.shape[0], 1)
+        x = signalsDiffused / norms.reshape(signalsDiffused.shape[0], 1)
+        
+        cutoff = 0.3
+        satslope = 10
+        targets = np.piecewise(x,
+                [x < -cutoff, np.logical_and(x >= -cutoff, x < cutoff),
+                 x >= cutoff],
+                [lambda x: x * satslope + (satslope - 1) * cutoff,
+                 lambda x: x,
+                 lambda x: x * satslope - (satslope - 1) * cutoff])
+
         # targets = 1/(1 + np.exp(20 * signals))
-        targets = np.tanh(20 * signalsDiffused) # Lower to 3 or 5
-        # targets = np.arctanh(signals) # Lower to 3 or 5
+        # targets = np.abs(signalsDiffused) # Lower to 3 or 5
+        #targets = np.tanh(20 * signalsDiffused) # Lower to 3 or 5
+        # targets = signalsDiffused
+        #targets = np.arctanh(signalsDiffused) # Lower to 3 or 5
         #signals += np.random.normal(0.0, 1.0, size=(nTotal, G.N))
 
         self.samples['train']['signals'] = signals[0:nTrain, :]
