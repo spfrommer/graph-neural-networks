@@ -353,12 +353,13 @@ class Wireless(_data):
         signals = np.random.normal(0.0, 1.0, size=(nTotal, G.N))
 
         signals = (VLHigh @ VLHigh.T @ signals.T).T # Project onto high eigenvalues
+        signals = signals @ Lnorm; # Diffuse once to make local average
         signalsDiffused = signals @ Lnorm;
         norms           = np.sqrt((signalsDiffused * signalsDiffused).sum(axis=1))
         x = signalsDiffused / norms.reshape(signalsDiffused.shape[0], 1)
         
-        cutoff = 0.2
-        satslope = 30
+        cutoff = 0.3
+        satslope = 5.0
         targets = np.piecewise(x,
                 [x < -cutoff, np.logical_and(x >= -cutoff, x < cutoff),
                  x >= cutoff],
@@ -368,7 +369,7 @@ class Wireless(_data):
 
         # targets = 1/(1 + np.exp(20 * signals))
         # targets = np.abs(signalsDiffused) # Lower to 3 or 5
-        #targets = np.tanh(20 * signalsDiffused) # Lower to 3 or 5
+        # targets = np.tanh(20 * signalsDiffused) # Lower to 3 or 5
         # targets = signalsDiffused
         #targets = np.arctanh(signalsDiffused) # Lower to 3 or 5
         #signals += np.random.normal(0.0, 1.0, size=(nTotal, G.N))

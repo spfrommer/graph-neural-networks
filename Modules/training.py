@@ -269,8 +269,8 @@ class Trainer:
                         nFilters += 1
 
             totalLoss = lossValueTrain + 0.3 * reg / nFilters
-        elif True:
-            totalLoss = lossValueTrain + 1.0 * self.model.archit.ILconstant()
+        elif False:
+            totalLoss = lossValueTrain + 2.0 * self.model.archit.ILconstant()
         else:
             totalLoss = lossValueTrain
 

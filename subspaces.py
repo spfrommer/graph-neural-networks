@@ -239,7 +239,7 @@ if doFilter:
     # Select architectural nn.Module to use
     modelFilter['archit'] = archit.LocalGNN
     # Graph convolutional layers
-    modelFilter['dimNodeSignals'] = [1, 32] # Number of features per layer
+    modelFilter['dimNodeSignals'] = [1, 128] # Number of features per layer
     modelFilter['nFilterTaps'] = [3] # Number of filter taps
     modelFilter['bias'] = True # Include bias
     # Nonlinearity
@@ -284,12 +284,14 @@ if doLocalGNN:
     modelLocalGNN['archit'] = archit.LocalGNN
     # modelLocalGNN['archit'] = archit.SpectralGNN
     # Graph convolutional layers
-    modelLocalGNN['dimNodeSignals'] = [1, 32] # Number of features per layer
+    modelLocalGNN['dimNodeSignals'] = [1, 128] # Number of features per layer
     modelLocalGNN['nFilterTaps'] = [3] # Number of filter taps
     # modelLocalGNN['nCoeff'] = [nNodes, nNodes] # Number of spectral coefficients
     modelLocalGNN['bias'] = True # Include bias
     # Nonlinearity
-    modelLocalGNN['nonlinearity'] = nn.Tanh
+    # modelLocalGNN['nonlinearity'] = nn.PReLU
+    #modelLocalGNN['nonlinearity'] = nn.Tanh
+    modelLocalGNN['nonlinearity'] = nn.LeakyReLU
     # Pooling
     modelLocalGNN['poolingFunction'] = gml.NoPool # Summarizing function
     modelLocalGNN['nSelectedNodes'] = [nNodes]
