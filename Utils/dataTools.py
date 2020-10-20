@@ -353,12 +353,18 @@ class Wireless(_data):
         signals = np.random.normal(0.0, 1.0, size=(nTotal, G.N))
 
         signals = (VLHigh @ VLHigh.T @ signals.T).T # Project onto high eigenvalues
-        signals = signals @ Lnorm;
         norms = np.sqrt((signals * signals).sum(axis=1))
         signals = signals / norms.reshape(signals.shape[0], 1)
+
+        coefs = (np.random.rand(3) - 0.5) * 2
+        targets = coefs[0] * signals + \
+                  coefs[1] * signals @ Lnorm + \
+                  coefs[2] * signals @ Lnorm @ Lnorm;
+        #targets = signals @ Lnorm + 0.5 * signals @ Lnorm @ Lnorm;
         #targets = 1/(1 + np.exp(20 * signals))
         #import pdb; pdb.set_trace()
-        targets = np.tanh(20 * signals) # Lower to 3 or 5
+        #targets = np.tanh(100 * signals) # Lower to 3 or 5
+        targets = np.sign(targets)
 
         self.samples['train']['signals'] = signals[0:nTrain, :]
         self.samples['train']['targets'] = targets[0:nTrain, :]

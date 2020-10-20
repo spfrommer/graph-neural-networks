@@ -6,12 +6,34 @@ import pathlib
 import pickle
 import json
 
+from scipy import stats
+
 import numpy as np
 
 import matplotlib
+from matplotlib import rc
 import matplotlib.pyplot as plt
+import numpy as np, scipy.stats as st
 
 import pdb
+
+
+# plt.rcParams.update({
+    # "text.usetex": True,
+    # "font.family": "sans-serif",
+    # "font.sans-serif": ["Helvetica"]})
+## for Palatino and other serif fonts use:
+plt.rcParams.update({
+    "text.usetex": True,
+    "font.family": "serif",
+    "font.serif": ["Palatino"],
+    "font.size": 32
+})
+
+# rc('font',**{'family':'sans-serif','sans-serif':['Helvetica'], 'size': 32})
+# rc('text', usetex=True)
+
+#matplotlib.rcParams.update({'font.size': 32})
 
 sweepdir = op.join('experimentGroups', 'sweep')
 
@@ -26,14 +48,32 @@ def plotResults():
     filter_std = [results['low']['Filter']['stddev'], results['all']['Filter']['stddev'], results['high']['Filter']['stddev']]
     gnn_std = [results['low']['LocalGNN']['stddev'], results['all']['LocalGNN']['stddev'], results['high']['LocalGNN']['stddev']]
 
+    confidence = 0.95
+    filter_confidence = [stats.norm.interval(confidence, loc=mean, scale=std)[1] - mean for (mean, std) in zip(filter_means, filter_std)]
+    gnn_confidence = [stats.norm.interval(confidence, loc=mean, scale=std)[1] - mean for (mean, std) in zip(gnn_means, gnn_std)]
+
     ind = np.arange(len(filter_means))  # the x locations for the groups
     width = 0.35  # the width of the bars
+    
+    pennred = (145/255.0, 17/255.0, 35/255.0) 
+    pennblue = (0/255.0, 46/255.0, 92/255.0) 
+    error_kw = dict(lw=5, capsize=5, capthick=3)
+    # error_kw = dict(lw=5)
 
     fig, ax = plt.subplots()
-    rects1 = ax.bar(ind - width/2, filter_means, width, yerr=filter_std,
-                    label='Filter')
-    rects2 = ax.bar(ind + width/2, gnn_means, width, yerr=gnn_std,
-                    label='GNN')
+    rects1 = ax.bar(ind - width/2, filter_means, width, yerr=filter_confidence,
+                    label='Filter', color=pennred, error_kw=error_kw)
+    rects2 = ax.bar(ind + width/2, gnn_means, width, yerr=gnn_confidence,
+                    label='GNN', color=pennblue, error_kw=error_kw)
+    # rects1 = ax.bar(ind - width/2, filter_means, width, yerr=filter_std,
+                    # label='Filter', color=pennred, error_kw=error_kw)
+    # rects2 = ax.bar(ind + width/2, gnn_means, width, yerr=gnn_std,
+                    # label='GNN', color=pennblue, error_kw=error_kw)
+
+    for rect in rects1 + rects2:
+        height = rect.get_height()
+        plt.text(rect.get_x() + rect.get_width()/2.0, 0, '{:.2f}'.format(height),
+                ha='center', va='bottom', color='white') 
 
     # Add some text for labels, title and custom x-axis tick labels, etc.
     ax.set_ylabel('MSE')

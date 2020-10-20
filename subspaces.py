@@ -132,7 +132,7 @@ nTest = 200 # Number of testing samples
 tMax = 25 # Maximum number of diffusion times (A^t for t < tMax)
 
 nDataRealizations = 1 # Number of data realizations
-nGraphRealizations = 2 # Number of graph realizations
+nGraphRealizations = 30 # Number of graph realizations
 nClasses = 5 # Number of source nodes to select
 
 nNodes = args.N # Number of nodes
@@ -241,7 +241,7 @@ if doFilter:
     # Graph convolutional layers
     modelFilter['dimNodeSignals'] = [1, 32] # Number of features per layer
     modelFilter['nFilterTaps'] = [3] # Number of filter taps
-    modelFilter['bias'] = True # Include bias
+    modelFilter['bias'] = False # Include bias
     # Nonlinearity
     modelFilter['nonlinearity'] = gml.NoActivation 
     # Pooling
@@ -287,7 +287,7 @@ if doLocalGNN:
     modelLocalGNN['dimNodeSignals'] = [1, 32] # Number of features per layer
     modelLocalGNN['nFilterTaps'] = [3] # Number of filter taps
     # modelLocalGNN['nCoeff'] = [nNodes, nNodes] # Number of spectral coefficients
-    modelLocalGNN['bias'] = True # Include bias
+    modelLocalGNN['bias'] = False # Include bias
     # Nonlinearity
     modelLocalGNN['nonlinearity'] = nn.Tanh
     # Pooling
