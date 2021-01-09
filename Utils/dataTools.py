@@ -359,7 +359,7 @@ class Wireless(_data):
         x = signalsDiffused / norms.reshape(signalsDiffused.shape[0], 1)
         
         cutoff = 0.3
-        satslope = 5.0
+        satslope = 0.1
         targets = np.piecewise(x,
                 [x < -cutoff, np.logical_and(x >= -cutoff, x < cutoff),
                  x >= cutoff],
@@ -883,6 +883,7 @@ class Authorship(_dataForClassification):
         self.samples['valid']['targets'] = labelsValid.astype(np.int)
         self.samples['test']['signals'] = xTest
         self.samples['test']['targets'] = labelsTest.astype(np.int)
+        pdb.set_trace()
         # Create graph
         self.createGraph()
         # Change data to specified type and device

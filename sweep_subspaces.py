@@ -88,17 +88,17 @@ for k in kBreak:
     k_results = {}
 
     lowDir = op.join(sweepdir, str(k), 'low')
-    subprocess.run(['python3.7', 'subspaces.py', '--N', str(nNodes),
+    subprocess.run(['python3.6', 'subspaces.py', '--N', str(nNodes),
         '--kLow', str(0), '--kHigh', str(k), '--saveDir', lowDir])
     k_results['low'] = get_results(lowDir)
 
     allDir = op.join(sweepdir, str(k), 'all')
-    subprocess.run(['python3.7', 'subspaces.py', '--N', str(nNodes),
+    subprocess.run(['python3.6', 'subspaces.py', '--N', str(nNodes),
         '--kLow', str(0), '--kHigh', str(nNodes), '--saveDir', allDir])
     k_results['all'] = get_results(allDir)
 
     highDir = op.join(sweepdir, str(k), 'high')
-    subprocess.run(['python3.7', 'subspaces.py', '--N', str(nNodes),
+    subprocess.run(['python3.6', 'subspaces.py', '--N', str(nNodes),
         '--kLow', str(k), '--kHigh', str(nNodes), '--saveDir', highDir])
     k_results['high'] = get_results(highDir)
 
