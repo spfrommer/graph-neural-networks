@@ -31,9 +31,9 @@ class Trainer:
     """
     Trainer: general trainer that just computes a loss over a training set and
         runs an evaluation on a validation test
-        
+
     Initialization:
-        
+
         model (Modules.model class): model to train
         data (Utils.data class): needs to have a getSamples and an evaluate
             method
@@ -41,13 +41,13 @@ class Trainer:
         batchSize (int): size of each minibatch
 
         Optional (keyword) arguments:
-            
+
         validationInterval (int): interval of training (number of training
             steps) without running a validation stage.
 
         learningRateDecayRate (float): float that multiplies the latest learning
             rate used.
-        learningRateDecayPeriod (int): how many training steps before 
+        learningRateDecayPeriod (int): how many training steps before
             multiplying the learning rate decay rate by the actual learning
             rate.
         > Obs.: Both of these have to be defined for the learningRateDecay
@@ -61,13 +61,13 @@ class Trainer:
         realitizationNo (int): keep track of what data realization this is
         >> Alternatively, these last two keyword arguments can be used to keep
             track of different trainings of the same model
-            
+
     Training:
-        
+
         .train(): trains the model and returns trainVars dict with the keys
             'nEpochs': number of epochs (int)
             'nBatches': number of batches (int)
-            'validationInterval': number of training steps in between 
+            'validationInterval': number of training steps in between
                 validation steps (int)
             'batchSize': batch size of each training step (np.array)
             'batchIndex': indices for the start sample and end sample of each
@@ -81,18 +81,18 @@ class Trainer:
             'evalValid': evaluation function on the validation samples for each
                 validation step (np.array)
     """
-    
+
     def __init__(self, model, data, nEpochs, batchSize, **kwargs):
-        
+
         #\\\ Store model
-        
+
         self.model = model
         self.data = data
-        
+
         ####################################
         # ARGUMENTS (Store chosen options) #
         ####################################
-        
+
         # Training Options:
         if 'doLogging' in kwargs.keys():
             doLogging = kwargs['doLogging']
@@ -154,14 +154,14 @@ class Trainer:
             logger = Visualizer(logsTB, name='visualResults')
         else:
             logger = None
-        
+
         # No training case:
         if nEpochs == 0:
             doSaveVars = False
             doLogging = False
             # If there's no training happening, there's nothing to report about
             # training losses and stuff.
-            
+
         ###########################################
         # DATA INPUT (pick up on data parameters) #
         ###########################################
@@ -199,7 +199,7 @@ class Trainer:
         # batchIndex[b]:batchIndex[b+1] gives the right samples for batch b.
         batchIndex = np.cumsum(batchSize).tolist()
         batchIndex = [0] + batchIndex
-        
+
         ###################
         # SAVE ATTRIBUTES #
         ###################
@@ -225,9 +225,9 @@ class Trainer:
         self.trainingOptions['nBatches'] = nBatches
         self.trainingOptions['graphNo'] = graphNo
         self.trainingOptions['realizationNo'] = realizationNo
-        
+
     def trainBatch(self, thisBatchIndices):
-        
+
         # Get the samples
         xTrain, yTrain = self.data.getSamples('train', thisBatchIndices)
         xTrain = xTrain.to(self.model.device)
@@ -243,7 +243,7 @@ class Trainer:
         yHatTrain = self.model.archit(xTrain)
 
         # Compute loss
-        lossValueTrain = self.model.loss(yHatTrain, yTrain)
+        lossValueTrain = self.model.loss(yHatTrain, yTrain.long())
 
 
         if False:
@@ -264,12 +264,12 @@ class Trainer:
                         responses = torch.zeros_like(evalPoints, device=lossValueTrain.device)
                         for n, coef in enumerate(coefs):
                             responses = responses + coef * evalPowers[n]
-                        
+
                         reg = reg + (responses - responses[0]).pow(2).sum()
                         nFilters += 1
 
             totalLoss = lossValueTrain + 3.0 * reg / nFilters
-        elif True:
+        elif False:
             totalLoss = lossValueTrain + 0.01 * self.model.archit.ILconstant()
         else:
             totalLoss = lossValueTrain
@@ -291,12 +291,12 @@ class Trainer:
         #   gradient operation is taken into account here.
         #   (Alternatively, we could use a with torch.no_grad():)
         costTrain = self.data.evaluate(yHatTrain.data, yTrain)
-        
+
         #return lossValueTrain.item(), costTrain.item(), timeElapsed
         return totalLoss.item(), costTrain.item(), timeElapsed
-    
+
     def validationStep(self):
-        
+
         # Validation:
         xValid, yValid = self.data.getSamples('valid')
         xValid = xValid.to(self.model.device)
@@ -322,11 +322,11 @@ class Trainer:
 
             # Compute accuracy:
             costValid = self.data.evaluate(yHatValid, yValid)
-        
+
         return lossValueValid.item(), costValid.item(), timeElapsed
-        
+
     def train(self):
-        
+
         # Get back the training options
         assert 'trainingOptions' in dir(self)
         assert 'doLogging' in self.trainingOptions.keys()
@@ -364,7 +364,7 @@ class Trainer:
         graphNo = self.trainingOptions['graphNo']
         assert 'realizationNo' in self.trainingOptions.keys()
         realizationNo = self.trainingOptions['realizationNo']
-        
+
         # Learning rate scheduler:
         if doLearningRateDecay:
             learningRateScheduler = torch.optim.lr_scheduler.StepLR(
@@ -374,7 +374,7 @@ class Trainer:
         # we had to drop the 'for' and use a 'while' instead):
         epoch = 0 # epoch counter
         lagCount = 0 # lag counter for early stopping
-        
+
         # Store the training variables
         lossTrain = []
         costTrain = []
@@ -428,10 +428,10 @@ class Trainer:
                 # Extract the adequate batch
                 thisBatchIndices = idxEpoch[batchIndex[batch]
                                             : batchIndex[batch+1]]
-                
+
                 lossValueTrain, costValueTrain, timeElapsed = \
                                                self.trainBatch(thisBatchIndices)
-                
+
 
                 # Logging values
                 if doLogging:
@@ -489,7 +489,7 @@ class Trainer:
                     if doPrint:
                         print("\t(E: %2d, B: %3d) %6.4f / %7.4f - %6.4fs" % (
                                 epoch+1, batch+1,
-                                costValueValid, 
+                                costValueValid,
                                 lossValueValid,
                                 timeElapsed), end = ' ')
                         print("[VALIDATION", end = '')
@@ -579,7 +579,7 @@ class Trainer:
                      'lossValid': lossValid,
                      'costValid': costValid
                      }
-        
+
         if doSaveVars:
             saveDirVars = os.path.join(self.model.saveDir, 'trainVars')
             if not os.path.exists(saveDirVars):
@@ -605,18 +605,18 @@ class Trainer:
         if doPrint and nEpochs > 0:
             print("=> Best validation achieved (E: %d, B: %d): %.4f" % (
                     bestEpoch + 1, bestBatch + 1, bestScore))
-            
+
         return trainVars
-    
+
 class TrainerSingleNode(Trainer):
     """
     TrainerSingleNode: trainer class that computes a loss over the training set
         and runs an evaluation on a validation set, but assuming that the
         architectures involved have a single node forward structure and that the
         data involved has a method for identifying the target nodes
-        
+
     Initialization:
-        
+
         model (Modules.model class): model to train
         data (Utils.data class): needs to have a getSamples and an evaluate
             method
@@ -624,13 +624,13 @@ class TrainerSingleNode(Trainer):
         batchSize (int): size of each minibatch
 
         Optional (keyword) arguments:
-            
+
         validationInterval (int): interval of training (number of training
             steps) without running a validation stage.
 
         learningRateDecayRate (float): float that multiplies the latest learning
             rate used.
-        learningRateDecayPeriod (int): how many training steps before 
+        learningRateDecayPeriod (int): how many training steps before
             multiplying the learning rate decay rate by the actual learning
             rate.
         > Obs.: Both of these have to be defined for the learningRateDecay
@@ -644,13 +644,13 @@ class TrainerSingleNode(Trainer):
         realitizationNo (int): keep track of what data realization this is
         >> Alternatively, these last two keyword arguments can be used to keep
             track of different trainings of the same model
-            
+
     Training:
-        
+
         .train(): trains the model and returns trainVars dict with the keys
             'nEpochs': number of epochs (int)
             'nBatches': number of batches (int)
-            'validationInterval': number of training steps in between 
+            'validationInterval': number of training steps in between
                 validation steps (int)
             'batchSize': batch size of each training step (np.array)
             'batchIndex': indices for the start sample and end sample of each
@@ -664,17 +664,17 @@ class TrainerSingleNode(Trainer):
             'evalValid': evaluation function on the validation samples for each
                 validation step (np.array)
     """
-    
+
     def __init__(self, model, data, nEpochs, batchSize, **kwargs):
-        
+
         assert 'singleNodeForward' in dir(model.archit)
         assert 'getLabelID' in dir(data)
-        
+
         # Initialize supraclass
         super().__init__(model, data, nEpochs, batchSize, **kwargs)
-        
+
     def trainBatch(self, thisBatchIndices):
-        
+
         # Get the samples
         xTrain, yTrain = self.data.getSamples('train', thisBatchIndices)
         xTrain = xTrain.to(self.model.device)
@@ -710,11 +710,11 @@ class TrainerSingleNode(Trainer):
         #   gradient operation is taken into account here.
         #   (Alternatively, we could use a with torch.no_grad():)
         costTrain = self.data.evaluate(yHatTrain.data, yTrain)
-        
+
         return lossValueTrain.item(), costTrain.item(), timeElapsed
-    
+
     def validationStep(self):
-        
+
         # Validation:
         xValid, yValid = self.data.getSamples('valid')
         xValid = xValid.to(self.model.device)
@@ -741,16 +741,16 @@ class TrainerSingleNode(Trainer):
 
             # Compute accuracy:
             costValid = self.data.evaluate(yHatValid, yValid)
-        
+
         return lossValueValid.item(), costValid.item(), timeElapsed
-        
+
 class TrainerFlocking(Trainer):
     """
     Trainer: trains flocking models, following the appropriate evaluation of
         the cost, and has options for different DAGger alternatives
-        
+
     Initialization:
-        
+
         model (Modules.model class): model to train
         data (Utils.data class): needs to have a getSamples and an evaluate
             method
@@ -758,14 +758,14 @@ class TrainerFlocking(Trainer):
         batchSize (int): size of each minibatch
 
         Optional (keyword) arguments:
-        
+
         probExpert (float): initial probability of choosing the expert
         DAGgerType ('fixedBatch', 'randomEpoch', 'replaceTimeBatch'):
             'fixedBatch' (default if 'probExpert' is defined): doubles the batch
-                samples by considering the same initial velocities and 
+                samples by considering the same initial velocities and
                 positions, a trajectory given by the latest trained
                 architecture, and the corresponding correction given by the
-                optimal acceleration (i.e. for each position and velocity we 
+                optimal acceleration (i.e. for each position and velocity we
                 give what would be the optimal acceleration, even though the
                 next position and velocity won't reflect this decision, but the
                 one taken by the learned policy)
@@ -776,15 +776,15 @@ class TrainerFlocking(Trainer):
             'replaceTimeBatch': creates a fixed number of new trajectories
                 following randomly at each time step either the optimal control
                 or the learned control; then, replaces this fixed number of new
-                trajectores into the training set (then these might, or might 
+                trajectores into the training set (then these might, or might
                 not get selected by the next batch)
-            
+
         validationInterval (int): interval of training (number of training
             steps) without running a validation stage.
 
         learningRateDecayRate (float): float that multiplies the latest learning
             rate used.
-        learningRateDecayPeriod (int): how many training steps before 
+        learningRateDecayPeriod (int): how many training steps before
             multiplying the learning rate decay rate by the actual learning
             rate.
         > Obs.: Both of these have to be defined for the learningRateDecay
@@ -798,20 +798,20 @@ class TrainerFlocking(Trainer):
         realitizationNo (int): keep track of what data realization this is
         >> Alternatively, these last two keyword arguments can be used to keep
             track of different trainings of the same model
-            
+
     Training:
-        
+
         .train(): trains the model and returns trainVars dict with the keys
             'nEpochs': number of epochs (int)
             'nBatches': number of batches (int)
-            'validationInterval': number of training steps in between 
+            'validationInterval': number of training steps in between
                 validation steps (int)
             'batchSize': batch size of each training step (np.array)
             'batchIndex': indices for the start sample and end sample of each
                 batch (np.array)
             'bestBatch': batch index at which the best model was achieved (int)
             'bestEpoch': epoch at which the best model was achieved (int)
-            'bestScore': evaluation measure on the validation sample that 
+            'bestScore': evaluation measure on the validation sample that
                 achieved the best model (i.e. minimum achieved evaluation
                 measure on the validation set)
             'lossTrain': loss function on the training samples for each training
@@ -821,32 +821,32 @@ class TrainerFlocking(Trainer):
                 validation step (np.array)
             'timeValid': time elapsed at each validation step (np.array)
     """
-    
+
     def __init__(self, model, data, nEpochs, batchSize, **kwargs):
-        
+
         # Initialize supraclass
         super().__init__(model, data, nEpochs, batchSize, **kwargs)
-        
+
         # Add the specific options
-        
+
         if 'probExpert' in kwargs.keys():
             doDAGger = True
             probExpert = kwargs['probExpert']
         else:
             doDAGger = False
-        
+
         if 'DAGgerType' in kwargs.keys():
             DAGgerType = kwargs['DAGgerType']
         else:
             DAGgerType = 'fixedBatch'
-                
+
         self.trainingOptions['doDAGger'] = doDAGger
         if doDAGger:
             self.trainingOptions['probExpert'] = probExpert
             self.trainingOptions['DAGgerType'] = DAGgerType
 
     def train(self):
-        
+
         # Get back the training options
         assert 'trainingOptions' in dir(self)
         assert 'doLogging' in self.trainingOptions.keys()
@@ -889,14 +889,14 @@ class TrainerFlocking(Trainer):
         if doDAGger:
             assert 'DAGgerType' in self.trainingOptions.keys()
             DAGgerType = self.trainingOptions['DAGgerType']
-        
+
         # Get the values we need
         nTrain = self.data.nTrain
         thisArchit = self.model.archit
         thisLoss = self.model.loss
         thisOptim = self.model.optim
         thisDevice = self.model.device
-        
+
         # Learning rate scheduler:
         if doLearningRateDecay:
             learningRateScheduler = torch.optim.lr_scheduler.StepLR(self.optim,
@@ -973,7 +973,7 @@ class TrainerFlocking(Trainer):
                     # print all of them.
                     print("Epoch %d, learning rate = %.8f" % (epoch+1,
                           learningRateScheduler.optim.param_groups[0]['lr']))
-                    
+
             #\\\\\\\\\\\\\\\\
             #\\\ Start DAGGER: randomEpoch
             #\\\
@@ -997,7 +997,7 @@ class TrainerFlocking(Trainer):
             batch = 0 # batch counter
             while batch < nBatches \
                       and (lagCount<earlyStoppingLag or (not doEarlyStopping)):
-                          
+
                 #\\\\\\\\\\\\\\\\
                 #\\\ Start DAGGER: replaceTimeBatch
                 #\\\
@@ -1029,7 +1029,7 @@ class TrainerFlocking(Trainer):
                 initVelTrain = initVelTrainAll[thisBatchIndices]
                 if doDAGger and DAGgerType == 'fixedBatch':
                     initPosTrain = initPosTrainAll[thisBatchIndices]
-                    
+
                 #\\\\\\\\\\\\\\\\
                 #\\\ Start DAGGER: fixedBatch
                 #\\\
@@ -1048,7 +1048,7 @@ class TrainerFlocking(Trainer):
 
                     xDAG, yDAG, SDAG = self.fixedBatchDAGger(initPosTrain,
                                                              initVelTrain)
-                        
+
                     xTrain = np.concatenate((xTrain, xDAG), axis = 0)
                     Strain = np.concatenate((Strain, SDAG), axis = 0)
                     yTrain = np.concatenate((yTrain, yDAG), axis = 0)
@@ -1132,21 +1132,21 @@ class TrainerFlocking(Trainer):
                 #\\\\\\\
 
                 if (epoch * nBatches + batch) % validationInterval == 0:
-                    
+
                     # Start measuring time
                     startTime = datetime.datetime.now()
-                    
+
                     # Create trajectories
-                    
+
                     # Initial data
                     initPosValid = self.data.getData('initPos','valid')
                     initVelValid = self.data.getData('initVel','valid')
-                    
+
                     # Compute trajectories
                     _, velTestValid, _, _, _ = self.data.computeTrajectory(
                             initPosValid, initVelValid, self.data.duration,
                             archit = thisArchit, doPrint = False)
-                    
+
                     # Compute evaluation
                     accValid = self.data.evaluate(vel = velTestValid)
 
@@ -1167,7 +1167,7 @@ class TrainerFlocking(Trainer):
                     if doPrint:
                         print("\t(E: %2d, B: %3d) %8.4f - %6.4fs" % (
                                 epoch+1, batch+1,
-                                accValid, 
+                                accValid,
                                 timeElapsed), end = ' ')
                         print("[VALIDATION", end = '')
                         if graphNo > -1:
@@ -1285,16 +1285,16 @@ class TrainerFlocking(Trainer):
                     bestEpoch + 1, bestBatch + 1, bestScore))
 
         return trainVars
-    
+
     def randomEpochDAGger(self, epoch, xTrainOrig, yTrainOrig, StrainOrig,
                           initPosTrainAll, initVelTrainAll):
-        
+
         # The 'randomEpoch' option forms a new training set for each
         # epoch consisting, with probability probExpert, of samples
         # of the original dataset (optimal trajectories) and with
         # probability 1-probExpert, with trajectories following the
         # latest trained dataset.
-        
+
         assert 'probExpert' in self.trainingOptions.kwargs()
         probExpert = self.trainingOptions['probExpert']
         nTrain = xTrainOrig.shape[0]
@@ -1438,21 +1438,21 @@ class TrainerFlocking(Trainer):
                 xDAG[s] = xDAGaux[0]
                 yDAG[s] = yDAGaux[0]
                 SDAG[s] = SDAGaux[0]
-                
+
         # And now that we have created the DAGger alternatives, we
         # just need to consider them as the basic training variables
         return xDAG, yDAG, SDAG
-    
+
     def replaceTimeBatchDAGger(self, epoch, xTrainAll, yTrainAll, StrainAll,
                                initPosTrainAll, initVelTrainAll, nReplace = 10):
-        
+
         # The option 'replaceTimeBatch' creates a fixed number of
         # new trajectories following randomly at each time step
         # either the optimal control or the learned control
         # Then, replaces this fixed number of new trajectores into
         # the training set (then these might, or might not get
         # selected by the next batch)
-        
+
         assert 'probExpert' in self.trainingOptions.kwargs()
         probExpert = self.trainingOptions['probExpert']
         nTrain = xTrainAll.shape[0]
@@ -1599,15 +1599,15 @@ class TrainerFlocking(Trainer):
 
         # And now that we have done this for all the samples in
         # the replacement set, just replace them
-            
+
         xTrainAll[replaceIndices] = xDAG
         yTrainAll[replaceIndices] = yDAG
         StrainAll[replaceIndices] = SDAG
-        
+
         return xTrainAll, yTrainAll, StrainAll
-    
+
     def fixedBatchDAGger(self, initPosTrain, initVelTrain):
-        
+
         # The 'fixedBatch' option, doubles the batch samples
         # by considering the same initial velocities and
         # positions, a trajectory given by the latest trained
@@ -1617,7 +1617,7 @@ class TrainerFlocking(Trainer):
         # optimal acceleration, even though the next position
         # and velocity won't reflect this decision, but the
         # one taken by the learned policy)
-        
+
         # Note that there's no point on doing it randomly here,
         # since the optimal trajectory is already considered in
         # the batch anyways.
@@ -1724,5 +1724,5 @@ class TrainerFlocking(Trainer):
                                        doPrint = False)
 
         # Add it to the existing batch
-        
+
         return xDAG, yDAG, graphDAG

@@ -5,11 +5,11 @@
 # Simulate the source localization problem. We have a graph, and we observe a
 # signal defined on top of this graph. This signal is assumed to represent the
 # diffusion of a rumor. The rumor is observed after being diffused for an
-# unknown amount of time. The objective is to determine which is the node (or 
+# unknown amount of time. The objective is to determine which is the node (or
 # the community) that started the rumor.
 
 # Outputs:
-# - Text file with all the hyperparameters selected for the run and the 
+# - Text file with all the hyperparameters selected for the run and the
 #   corresponding results (hyperparameters.txt)
 # - Pickle file with the random seeds of both torch and numpy for accurate
 #   reproduction of results (randomSeedUsed.pkl)
@@ -77,7 +77,7 @@ args = parser.parse_args()
 
 graphType = 'geometric' # Type of graph: 'SBM', 'SmallWorld', 'geometric'
 
-if args.saveDir != '': 
+if args.saveDir != '':
     saveDir = args.saveDir
 else:
     thisFilename = 'subspaces' # This is the general name of all related files
@@ -202,7 +202,7 @@ writeVarValues(varsFile,
 #################
 
 # Select desired architectures
-doFilter = True 
+doFilter = True
 doLocalGNN = True
 
 # In this section, we determine the (hyper)parameters of models that we are
@@ -212,7 +212,7 @@ doLocalGNN = True
 
 # If the model dictionary is called 'model' + name, then it can be
 # picked up immediately later on, and there's no need to recode anything after
-# the section 'Setup' (except for setting the number of nodes in the 'N' 
+# the section 'Setup' (except for setting the number of nodes in the 'N'
 # variable after it has been coded).
 
 # The name of the keys in the model dictionary have to be the same
@@ -227,15 +227,15 @@ modelList = []
 
 if doFilter:
     #\\\ Basic parameters for all the Local GNN architectures
-    
+
     modelFilter = {}
     modelFilter['name'] = 'Filter' # To be modified later on depending on the
         # specific ordering selected
     modelFilter['device'] = 'cuda:0' if (useGPU and torch.cuda.is_available()) \
                                      else 'cpu'
-                                     
+
     #\\\ ARCHITECTURE
-    
+
     # Select architectural nn.Module to use
     modelFilter['archit'] = archit.LocalGNN
     # Graph convolutional layers
@@ -243,11 +243,11 @@ if doFilter:
     modelFilter['nFilterTaps'] = [3] # Number of filter taps
     modelFilter['bias'] = False # Include bias
     # Nonlinearity
-    modelFilter['nonlinearity'] = gml.NoActivation 
+    modelFilter['nonlinearity'] = gml.NoActivation
     # Pooling
     modelFilter['poolingFunction'] = gml.NoPool # Summarizing function
     modelFilter['nSelectedNodes'] = [nNodes]
-    # modelFilter['nSelectedNodes'] = None 
+    # modelFilter['nSelectedNodes'] = None
     modelFilter['poolingSize'] = [1] # poolingSize-hop neighborhood that
                                         # is affected by the summary
     # Readout layer
@@ -256,30 +256,30 @@ if doFilter:
     # Graph Structure
     modelFilter['GSO'] = None # To be determined later on, based on data
     modelFilter['order'] = None
-    
+
     #\\\ TRAINER
 
     modelFilter['trainer'] = training.Trainer
-    
+
     #\\\ EVALUATOR
-    
+
     modelFilter['evaluator'] = evaluation.evaluate
 
     modelList += [modelFilter['name']]
 
 
 if doLocalGNN:
-    
+
     #\\\ Basic parameters for all the Local GNN architectures
-    
+
     modelLocalGNN = {}
     modelLocalGNN['name'] = 'LocalGNN' # To be modified later on depending on the
         # specific ordering selected
     modelLocalGNN['device'] = 'cuda:0' if (useGPU and torch.cuda.is_available()) \
                                      else 'cpu'
-                                     
+
     #\\\ ARCHITECTURE
-        
+
     # Select architectural nn.Module to use
     modelLocalGNN['archit'] = archit.LocalGNN
     # modelLocalGNN['archit'] = archit.SpectralGNN
@@ -293,7 +293,7 @@ if doLocalGNN:
     # Pooling
     modelLocalGNN['poolingFunction'] = gml.NoPool # Summarizing function
     modelLocalGNN['nSelectedNodes'] = [nNodes]
-    # modelLocalGNN['nSelectedNodes'] = None 
+    # modelLocalGNN['nSelectedNodes'] = None
     modelLocalGNN['poolingSize'] = [1] # poolingSize-hop neighborhood that
                                         # is affected by the summary
     # Readout layer
@@ -302,13 +302,13 @@ if doLocalGNN:
     # Graph Structure
     modelLocalGNN['GSO'] = None # To be determined later on, based on data
     modelLocalGNN['order'] = None
-    
+
     #\\\ TRAINER
 
     modelLocalGNN['trainer'] = training.Trainer
-    
+
     #\\\ EVALUATOR
-    
+
     modelLocalGNN['evaluator'] = evaluation.evaluate
 
     modelList += [modelLocalGNN['name']]
@@ -368,7 +368,7 @@ if doLogging:
     from Utils.visualTools import Visualizer
     logsTB = os.path.join(saveDir, 'logsTB')
     logger = Visualizer(logsTB, name='visualResults')
-    
+
 #\\\ Save variables during evaluation.
 # We will save all the evaluations obtained for each of the trained models.
 # It basically is a dictionary, containing a list. The key of the
@@ -422,7 +422,7 @@ if doLearningRateDecay:
     trainingOptions['learningRateDecayPeriod'] = learningRateDecayPeriod
 trainingOptions['validationInterval'] = validationInterval
 
-# And in case each model has specific training options, then we create a 
+# And in case each model has specific training options, then we create a
 # separate dictionary per model.
 
 trainingOptsPerModel= {}
@@ -449,11 +449,11 @@ for graph in range(nGraphRealizations):
     for thisModel in modelList:
         costBest[thisModel][graph] = []
         costLast[thisModel][graph] = []
-        
+
         lossTrain[thisModel][graph] = []
         costTrain[thisModel][graph] = []
         lossValid[thisModel][graph] = []
-        costValid[thisModel][graph] = []       
+        costValid[thisModel][graph] = []
 
     #%%##################################################################
     #                                                                   #
@@ -481,9 +481,9 @@ for graph in range(nGraphRealizations):
                                         nTrain, nValid, nTest)
         data.astype(torch.float64)
         #data.to(device)
-        data.expandDims() # Data are just graph signals, but the architectures 
+        data.expandDims() # Data are just graph signals, but the architectures
             # require that the input signals are of the form B x F x N, so we
-            # need to expand the middle dimensions to convert them from B x N 
+            # need to expand the middle dimensions to convert them from B x N
             # to B x 1 x N
 
         #%%##################################################################
@@ -491,23 +491,23 @@ for graph in range(nGraphRealizations):
         #                    MODELS INITIALIZATION                          #
         #                                                                   #
         #####################################################################
-        
+
         # This is the dictionary where we store the models (in a model.Model
         # class, that is then passed to training).
         modelsGNN = {}
-    
+
         # If a new model is to be created, it should be called for here.
-        
+
         if doPrint:
             print("Model initialization...", flush = True)
-        
+
         for thisModel in modelList:
-            
+
             # Get the corresponding parameter dictionary
             modelDict = deepcopy(eval('model' + thisModel))
             # and training options
             trainingOptsPerModel[thisModel] = deepcopy(trainingOptions)
-            
+
             # Now, this dictionary has all the hyperparameters that we need to
             # pass to the architecture function, but it also has other keys
             # that belong to the more general model (like 'name' or 'device'),
@@ -518,8 +518,8 @@ for graph in range(nGraphRealizations):
             thisDevice = modelDict.pop('device')
             thisTrainer = modelDict.pop('trainer')
             thisEvaluator = modelDict.pop('evaluator')
-            
-            # If more than one graph or data realization is going to be 
+
+            # If more than one graph or data realization is going to be
             # carried out, we are going to store all of thos models
             # separately, so that any of them can be brought back and
             # studied in detail.
@@ -527,22 +527,22 @@ for graph in range(nGraphRealizations):
                 thisName += 'G%02d' % graph
             if nDataRealizations > 1:
                 thisName += 'R%02d' % realization
-                
+
             if doPrint:
                 print("\tInitializing %s..." % thisName,
                       end = ' ',flush = True)
-                
+
             ##############
             # PARAMETERS #
             ##############
-    
+
             #\\\ Optimizer options
             #   (If different from the default ones, change here.)
             thisOptimAlg = optimAlg
             thisLearningRate = learningRate
             thisBeta1 = beta1
             thisBeta2 = beta2
-    
+
             #\\\ GSO
             # The coarsening technique is defined for the normalized and
             # rescaled Laplacian, whereas for the other ones we use the
@@ -554,19 +554,19 @@ for graph in range(nGraphRealizations):
             else:
                 #S = G.S.copy()/np.max(np.real(G.E))
                 S = G.S.copy()/np.max(np.real(G.E))
-                
+
             modelDict['GSO'] = S
-            
+
             ################
             # ARCHITECTURE #
             ################
-    
+
             thisArchit = callArchit(**modelDict)
-            
+
             #############
             # OPTIMIZER #
             #############
-    
+
             if thisOptimAlg == 'ADAM':
                 thisOptim = optim.Adam(thisArchit.parameters(),
                                        lr = learningRate,
@@ -577,22 +577,22 @@ for graph in range(nGraphRealizations):
             elif thisOptimAlg == 'RMSprop':
                 thisOptim = optim.RMSprop(thisArchit.parameters(),
                                           lr = learningRate, alpha = beta1)
-    
+
             ########
             # LOSS #
             ########
-    
+
             # Initialize the loss function
             # def thisLossFunction(x,y):
                 # x = x.squeeze()
                 # y = y.squeeze()
                 # return lossFunction()(x,y)
             thisLossFunction = lossFunction()
-    
+
             #########
             # MODEL #
             #########
-    
+
             # Create the model
             modelCreated = model.Model(thisArchit,
                                        thisLossFunction,
@@ -602,10 +602,10 @@ for graph in range(nGraphRealizations):
                                        thisDevice,
                                        thisName,
                                        saveDir)
-    
+
             # Store it
             modelsGNN[thisName] = modelCreated
-    
+
             # Write the main hyperparameters
             writeVarValues(varsFile,
                            {'name': thisName,
@@ -615,13 +615,13 @@ for graph in range(nGraphRealizations):
                             'thisLearningRate': thisLearningRate,
                             'thisBeta1': thisBeta1,
                             'thisBeta2': thisBeta2})
-    
+
             if doPrint:
                 print("OK")
-                
+
         if doPrint:
             print("Model initialization... COMPLETE")
-    
+
         #%%##################################################################
         #                                                                   #
         #                    TRAINING                                       #
@@ -629,16 +629,16 @@ for graph in range(nGraphRealizations):
         #####################################################################
 
         print("")
-        
+
         # We train each model separately
-    
+
         for thisModel in modelsGNN.keys():
-            
+
             if doPrint:
                 print("Training model %s..." % thisModel)
-             
-            # Remember that modelsGNN.keys() has the split numbering as well as 
-            # the name, while modelList has only the name. So we need to map 
+
+            # Remember that modelsGNN.keys() has the split numbering as well as
+            # the name, while modelList has only the name. So we need to map
             # the specific model for this specific split with the actual model
             # name, since there are several variables that are indexed by the
             # model name (for instance, the training options, or the
@@ -646,19 +646,19 @@ for graph in range(nGraphRealizations):
             for m in modelList:
                 if m in thisModel:
                     modelName = m
-        
+
             # Identify the specific graph and data realizations at training time
             if nGraphRealizations > 1:
                 trainingOptions['graphNo'] = graph
             if nDataRealizations > 1:
                 trainingOptions['realizationNo'] = realization
-            
+
             # Train the model
             thisTrainVars = modelsGNN[thisModel].train(data,
                                                        nEpochs,
                                                        batchSize,
                                                        **trainingOptsPerModel[modelName])
-    
+
             if doFigs:
             # Find which model to save the results (when having multiple
             # realizations)
@@ -666,7 +666,7 @@ for graph in range(nGraphRealizations):
                 costTrain[modelName][graph] += [thisTrainVars['costTrain']]
                 lossValid[modelName][graph] += [thisTrainVars['lossValid']]
                 costValid[modelName][graph] += [thisTrainVars['costValid']]
-                        
+
         # And we also need to save 'nBatch' but is the same for all models, so
         if doFigs:
             nBatches = thisTrainVars['nBatches']
@@ -676,13 +676,13 @@ for graph in range(nGraphRealizations):
         #                    EVALUATION                                     #
         #                                                                   #
         #####################################################################
-        
+
         # Now that the model has been trained, we evaluate them on the test
         # samples.
-    
+
         # We have two versions of each model to evaluate: the one obtained
         # at the best result of the validation step, and the last trained model.
-    
+
         if doPrint:
             print("\nTotal testing error rate", end = '', flush = True)
             if nGraphRealizations > 1 or nDataRealizations > 1:
@@ -696,34 +696,34 @@ for graph in range(nGraphRealizations):
                           flush = True)
                 print(")", end = '', flush = True)
             print(":", flush = True)
-            
-    
+
+
         for thisModel in modelsGNN.keys():
-            
+
             # Same as before, separate the model name from the data or graph
             # realization number
             for m in modelList:
                 if m in thisModel:
                     modelName = m
-    
+
             # Evaluate the model
             thisEvalVars = modelsGNN[thisModel].evaluate(data)
-            
+
             # Save the outputs
             thisCostBest = thisEvalVars['costBest']
             thisCostLast = thisEvalVars['costLast']
-            
+
             # Write values
             writeVarValues(varsFile,
                            {'costBest%s' % thisModel: thisCostBest,
                             'costLast%s' % thisModel: thisCostLast})
-    
+
             # Now check which is the model being trained
             costBest[modelName][graph] += [thisCostBest]
             costLast[modelName][graph] += [thisCostLast]
             # This is so that we can later compute a total accuracy with
             # the corresponding error.
-            
+
             if doPrint:
                 print("\t%s: %6.4f [Best] %6.4f [Last]" % (thisModel,
                                                                thisCostBest,
@@ -754,7 +754,7 @@ for thisModel in modelList:
     # Convert the lists into a nGraphRealizations x nDataRealizations matrix
     costBest[thisModel] = np.array(costBest[thisModel])
     costLast[thisModel] = np.array(costLast[thisModel])
-    
+
     if nGraphRealizations == 1 or nDataRealizations == 1:
         meanCostBestPerGraph[thisModel] = np.squeeze(costBest[thisModel])
         meanCostLastPerGraph[thisModel] = np.squeeze(costLast[thisModel])
@@ -784,7 +784,7 @@ for thisModel in modelList:
                 'stdDevCostBest%s' % thisModel: stdDevCostBest[thisModel],
                 'meanCostLast%s' % thisModel: meanCostLast[thisModel],
                 'stdDevCostLast%s' % thisModel : stdDevCostLast[thisModel]})
-    
+
 with open(varsFile, 'a+') as file:
     file.write("Final evaluations (%02d graphs, %02d realizations)\n" % (
             nGraphRealizations, nDataRealizations))
@@ -806,11 +806,11 @@ with open(varsFile, 'a+') as file:
 # Finally, we might want to plot several quantities of interest
 
 if doFigs and doSaveVars:
-    
+
     ###################
     # DATA PROCESSING #
     ###################
-    
+
     #\\\ FIGURES DIRECTORY:
     saveDirFigs = os.path.join(saveDir,'figs')
     # If it doesn't exist, create it.
@@ -1021,12 +1021,12 @@ if doPrint:
     print("Total time: %dh %dm %.2fs" % (totalRunTimeH,
                                          totalRunTimeM,
                                          totalRunTimeS))
-    
+
 # And save this info into the .txt file as well
 with open(varsFile, 'a+') as file:
-    file.write("Simulation started: %s\n" % 
+    file.write("Simulation started: %s\n" %
                                      startRunTime.strftime("%Y/%m/%d %H:%M:%S"))
-    file.write("Simulation ended:   %s\n" % 
+    file.write("Simulation ended:   %s\n" %
                                        endRunTime.strftime("%Y/%m/%d %H:%M:%S"))
     file.write("Total time: %dh %dm %.2fs" % (totalRunTimeH,
                                               totalRunTimeM,

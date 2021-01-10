@@ -6,14 +6,14 @@
 dataTools.py Data management module
 
 Functions:
-    
+
 normalizeData: normalize data along a specified axis
 changeDataType: change data type of data
 
 Classes (datasets):
 
 FacebookEgo (class): loads the Facebook adjacency matrix of EgoNets
-SourceLocalization (class): creates the datasets for a source localization 
+SourceLocalization (class): creates the datasets for a source localization
     problem
 Authorship (class): loads and splits the dataset for the authorship attribution
     problem
@@ -24,6 +24,7 @@ Flocking (class): creates trajectories for the problem of flocking
 TwentyNews (class): handles the 20NEWS dataset
 """
 
+import math
 import os
 import pickle
 import hdf5storage # This is required to import old Matlab(R) files.
@@ -46,10 +47,10 @@ zeroTolerance = 1e-9 # Values below this number are considered zero.
 
 def normalizeData(x, ax):
     """
-    normalizeData(x, ax): normalize data x (subtract mean and divide by standard 
+    normalizeData(x, ax): normalize data x (subtract mean and divide by standard
     deviation) along the specified axis ax
     """
-    
+
     thisShape = x.shape # get the shape
     assert ax < len(thisShape) # check that the axis that we want to normalize
         # is there
@@ -82,24 +83,24 @@ def changeDataType(x, dataType):
     """
     changeDataType(x, dataType): change the dataType of variable x into dataType
     """
-    
+
     # So this is the thing: To change data type it depends on both, what dtype
     # the variable already is, and what dtype we want to make it.
     # Torch changes type by .type(), but numpy by .astype()
     # If we have already a torch defined, and we apply a torch.tensor() to it,
     # then there will be warnings because of gradient accounting.
-    
+
     # All of these facts make changing types considerably cumbersome. So we
     # create a function that just changes type and handles all this issues
     # inside.
-    
+
     # If we can't recognize the type, we just make everything numpy.
-    
+
     # Check if the variable has an argument called 'dtype' so that we can now
     # what type of data type the variable is
     if 'dtype' in dir(x):
         varType = x.dtype
-    
+
     # So, let's start assuming we want to convert to numpy
     if 'numpy' in repr(dataType):
         # Then, the variable con be torch, in which case we move it to cpu, to
@@ -117,12 +118,12 @@ def changeDataType(x, dataType):
         # But, if it's numpy
         elif 'numpy' in repr(type(x)):
             x = torch.tensor(x, dtype = dataType)
-            
+
     # This only converts between numpy and torch. Any other thing is ignored
     return x
 
 def invertTensorEW(x):
-    
+
     # Elementwise inversion of a tensor where the 0 elements are kept as zero.
     # Warning: Creates a copy of the tensor
     xInv = x.copy() # Copy the matrix to invert
@@ -130,7 +131,7 @@ def invertTensorEW(x):
     xInv[x < zeroTolerance] = 1. # Replace zeros for ones
     xInv = 1./xInv # Now we can invert safely
     xInv[x < zeroTolerance] = 0. # Put back the zeros
-    
+
     return xInv
 
 class _data:
@@ -139,13 +140,13 @@ class _data:
     #   getSamples(), expandDims(), to() and astype().
     # To avoid coding this methods over and over again, we create a class from
     # which the data can inherit this basic methods.
-    
+
     # All the signals are always assumed to be graph signals that are written
     #   nDataPoints (x nFeatures) x nNodes
     # If we have one feature, we have the expandDims() that adds a x1 so that
     # it can be readily processed by architectures/functions that always assume
     # a 3-dimensional signal.
-    
+
     def __init__(self):
         # Minimal set of attributes that all data classes should have
         self.dataType = None
@@ -163,7 +164,7 @@ class _data:
         self.samples['test'] = {}
         self.samples['test']['signals'] = None
         self.samples['test']['targets'] = None
-        
+
     def getSamples(self, samplesType, *args):
         # samplesType: train, valid, test
         # args: 0 args, give back all
@@ -199,7 +200,7 @@ class _data:
                 xSelected = x[args[0]]
                 # And assign the labels
                 y = y[args[0]]
-                
+
             # If we only selected a single element, then the nDataPoints dim
             # has been left out. So if we have less dimensions, we have to
             # put it back
@@ -212,11 +213,11 @@ class _data:
                 x = xSelected
 
         return x, y
-    
+
     def expandDims(self):
         # For each data set partition
         for key in self.samples.keys():
-            for dataKey in ['signals', 'targets']: 
+            for dataKey in ['signals', 'targets']:
                 # If there's something in them
                 if self.samples[key][dataKey] is not None:
                     # And if it has only two dimensions
@@ -234,21 +235,21 @@ class _data:
                             self.samples[key][dataKey] = np.expand_dims(
                                                        self.samples[key][dataKey],
                                                        axis = 1)
-        
+
     def astype(self, dataType):
-        # This changes the type for the minimal attributes (samples). This 
+        # This changes the type for the minimal attributes (samples). This
         # methods should still be initialized within the data classes, if more
         # attributes are used.
-        
+
         # The labels could be integers as created from the dataset, so if they
-        # are, we need to be sure they are integers also after conversion. 
-        # To do this we need to match the desired dataType to its int 
+        # are, we need to be sure they are integers also after conversion.
+        # To do this we need to match the desired dataType to its int
         # counterpart. Typical examples are:
         #   numpy.float64 -> numpy.int64
         #   numpy.float32 -> numpy.int32
         #   torch.float64 -> torch.int64
         #   torch.float32 -> torch.int32
-        
+
         targetType = str(self.samples['train']['targets'].dtype)
         if 'int' in targetType:
             if 'numpy' in repr(dataType):
@@ -263,7 +264,7 @@ class _data:
                     targetType = torch.int32
         else: # If there is no int, just stick with the given dataType
             targetType = dataType
-        
+
         # Now that we have selected the dataType, and the corresponding
         # labelType, we can proceed to convert the data into the corresponding
         # type
@@ -280,7 +281,7 @@ class _data:
             self.dataType = dataType
 
     def to(self, device):
-        # This changes the type for the minimal attributes (samples). This 
+        # This changes the type for the minimal attributes (samples). This
         # methods should still be initialized within the data classes, if more
         # attributes are used.
         # This can only be done if they are torch tensors
@@ -299,11 +300,11 @@ class _dataForClassification(_data):
     # for classification. This renders the .evaluate() method the same in all
     # cases (how many examples are incorrectly labeled) so justifies the use of
     # another internal class.
-    
+
     def __init__(self):
-        
+
         super().__init__()
-    
+
 
     def evaluate(self, yHat, y, tol = 1e-9):
         """
@@ -327,6 +328,87 @@ class _dataForClassification(_data):
         #   And from that, compute the accuracy
         return errorRate
 
+class TopologyClassification(_dataForClassification):
+    def __init__(self, G, nTrain, nValid, nTest,
+                 dataType = np.float64, device = 'cpu'):
+        # Initialize parent
+        super().__init__()
+        # store attributes
+        self.dataType = dataType
+        self.device = device
+        self.nTrain = nTrain
+        self.nValid = nValid
+        self.nTest = nTest
+
+        #\\\ Generate the samples
+        # Get the largest eigenvalue of the weighted adjacency matrix
+        EW, VW = graph.computeGFT(G.L, order = 'totalVariation')
+        # VW has eigenvectors in columns, lowest TV is last
+        eMax = np.max(EW)
+        # Normalize the matrix so that it doesn't explode
+        Wnorm = G.W / eMax
+        # total number of samples
+        nTotal = nTrain + nValid + nTest
+
+        do_planes = False
+        do_circles = True
+
+        N = G.N
+
+        if do_planes:
+            n_points = math.ceil(np.sqrt(nTotal)) + 1
+            n_points = n_points + n_points % 2
+
+            xs = np.linspace(-1, 1, n_points)
+            ys = np.linspace(-1, 1, n_points)
+            X, Y = np.meshgrid(xs, ys)
+
+            plane_points = np.array([X.flatten(), Y.flatten()]).T
+
+            zeros_column = np.zeros((plane_points.shape[0], 1))
+            zeros_padding = np.zeros((plane_points.shape[0], N - 3))
+
+            pos_points = np.hstack((plane_points, zeros_column, zeros_padding))
+            neg_points = np.hstack((zeros_column, plane_points, zeros_padding))
+
+        if do_circles:
+            #length = np.expand_dims(np.sqrt(np.random.uniform(0, 1, size=(nTotal))), 1)
+            length = np.expand_dims(np.random.uniform(0, 1, size=(nTotal)), 1)
+            angle = np.expand_dims(np.pi * np.random.uniform(0, 2, size=(nTotal)), 1)
+
+            points = length * np.concatenate((np.cos(angle), np.sin(angle)), axis=1)
+            points = np.hstack((points, np.zeros((points.shape[0], N - 2))))
+
+            pos_points = points[np.repeat(length < 0.5, points.shape[1], axis=1)].reshape(-1, N)
+            neg_points = points[np.repeat(length > 0.5, points.shape[1], axis=1)].reshape(-1, N)
+
+        pos_points = pos_points @ VW.T + 0.05 * np.random.normal(size=pos_points.shape)
+        neg_points = neg_points @ VW.T + 0.05 * np.random.normal(size=neg_points.shape)
+
+        signals = np.vstack((pos_points, neg_points))
+        targets = np.hstack((np.ones((pos_points.shape[0], )),
+                             np.zeros((neg_points.shape[0], ))))
+
+        perm = np.random.permutation(signals.shape[0])
+        signals = signals[perm]
+        targets = targets[perm]
+
+        self.VW = VW
+
+        self.pos_points = pos_points
+        self.neg_points = neg_points
+
+        self.samples['train']['signals'] = signals[0:nTrain, :]
+        self.samples['train']['targets'] = np.array(targets[0:nTrain]).astype(int)
+        self.samples['valid']['signals'] = signals[nTrain:nTrain+nValid, :]
+        self.samples['valid']['targets'] =np.array(targets[nTrain:nTrain+nValid]).astype(int)
+        self.samples['test']['signals'] = signals[nTrain+nValid:nTotal, :]
+        self.samples['test']['targets'] =np.array(targets[nTrain+nValid:nTotal]).astype(int)
+
+        # Change data to specified type and device
+        self.astype(self.dataType)
+        self.to(self.device)
+
 class Wireless(_data):
     def __init__(self, G, kLow, kHigh, nTrain, nValid, nTest,
                        dataType = np.float64, device = 'cpu'):
@@ -336,7 +418,7 @@ class Wireless(_data):
         self.nTrain = nTrain
         self.nValid = nValid
         self.nTest = nTest
-        
+
         # LW has eigenvectors as columns
         # Last eigenvector is lowest frequency (constant)
         EL, VL = graph.computeGFT(G.L, order = 'totalVariation')
@@ -386,48 +468,48 @@ class Wireless(_data):
             mse = torch.nn.functional.mse_loss(yHat, y)
             rmse = torch.sqrt(mse)
         else:
-            mse = np.mean((yHat - y) ** 2) 
+            mse = np.mean((yHat - y) ** 2)
             rmse = np.sqrt(mse)
 
         return mse
-        
+
 class FacebookEgo:
     """
     FacebookEgo: Loads the adjacency matrix of the Facebook Egonets available
         in https://snap.stanford.edu/data/ego-Facebook.html by
         J. McAuley and J. Leskovec. Learning to Discover Social Circles in Ego
         Networks. NIPS, 2012.
-        
+
     Initialization:
-        
+
     Input:
-        dataDir (string): path for the directory in where to look for the data 
+        dataDir (string): path for the directory in where to look for the data
             (if the data is not found, it will be downloaded to this directory)
         use234 (bool): if True, load a smaller subnetwork of 234 users with two
             communities (one big, and one small)
-            
+
     Methods:
-        
+
     .loadData(filename, use234): load the data in self.dataDir/filename, if it
         does not exist, then download it and save it as filename in self.dataDir
         If use234 is True, load the 234-user subnetwork as well.
-        
+
     adjacencyMatrix = .getAdjacencyMatrix([use234]): return the nNodes x nNodes
         np.array with the adjacency matrix. If use234 is True, then return the
         smaller nNodes = 234 user subnetwork (default: use234 = False).
     """
-    
+
     def __init__(self, dataDir, use234 = False):
-        
+
         # Dataset directory
         self.dataDir = dataDir
         # Empty attributes
         self.adjacencyMatrix = None
         self.adjacencyMatrix234 = None
-        
+
         # Load data
         self.loadData('facebookEgo.pkl', use234)
-        
+
     def loadData(self, filename, use234):
         # Check if the dataDir exists, and if not, create it
         if not os.path.exists(self.dataDir):
@@ -448,7 +530,7 @@ class FacebookEgo:
                 # And save the corresponding variable
                 self.adjacencyMatrix = datasetDict['adjacencyMatrix']
         else: # If it doesn't exist, load it
-            # There could be three options here: that we have the raw data 
+            # There could be three options here: that we have the raw data
             # already there, that we have the zip file and need to unzip it,
             # or that we do not have nothing and we need to download it.
             existsRawData = \
@@ -488,7 +570,7 @@ class FacebookEgo:
                     node_i = int(dataLineSplit[0])
                     node_j = int(dataLineSplit[1])
                     node_max = max(node_i, node_j) # Get the largest node
-                    # Now we have to add this information to the adjacency 
+                    # Now we have to add this information to the adjacency
                     # matrix.
                     #   We need to check whether we need to add more elements
                     if node_max+1 > max(adjacencyMatrix.shape):
@@ -516,9 +598,9 @@ class FacebookEgo:
                         {'adjacencyMatrix': self.adjacencyMatrix},
                         datasetFile
                         )
-    
+
     def getAdjacencyMatrix(self, use234 = False):
-        
+
         return self.adjacencyMatrix234 if use234 else self.adjacencyMatrix
 
 class SourceLocalization(_dataForClassification):
@@ -557,7 +639,7 @@ class SourceLocalization(_dataForClassification):
             labels (dtype.array): numberSamples
             >> Obs.: The 0th dimension matches the corresponding signal to its
                 respective label
-                
+
     .expandDims(): Adds the feature dimension to the graph signals (i.e. for
         graph signals of shape nSamples x nNodes, turns them into shape
         nSamples x 1 x nNodes, so that they can be handled by general graph
@@ -641,22 +723,22 @@ class SourceLocalization(_dataForClassification):
         # Change data to specified type and device
         self.astype(self.dataType)
         self.to(self.device)
-    
+
 class Authorship(_dataForClassification):
     """
     Authorship: Loads the dataset of 19th century writers for the authorship
         attribution problem
-        
+
     Credits for this dataset to Mark Eisen. Please, refer to this paper for
     details, and whenever using this dataset:
         S. Segarra, M. Eisen and A. Ribeiro, Authorship Attribution through
         Function Word Adjacency Networks, IEEE Trans. Signal Process., vol. 63,
         Issue 20, Oct 2015.
-        
-    Possible authors: 
+
+    Possible authors:
         jacob 'abbott',         robert louis 'stevenson',   louisa may 'alcott',
         horatio 'alger',        james 'allen',              jane 'austen',
-        emily 'bronte',         james 'cooper',             charles 'dickens', 
+        emily 'bronte',         james 'cooper',             charles 'dickens',
         hamlin 'garland',       nathaniel 'hawthorne',      henry 'james',
         herman 'melville',      'page',                     henry 'thoreau',
         mark 'twain',           arthur conan 'doyle',       washington 'irving',
@@ -681,12 +763,12 @@ class Authorship(_dataForClassification):
         device (device): where to store the data (e.g., 'cpu', 'cuda:0', etc.)
 
     Methods:
-        
-    .loadData(dataPath): load the data found in dataPath and store it in 
+
+    .loadData(dataPath): load the data found in dataPath and store it in
         attributes .authorData and .functionWords
-        
+
     authorData = .getAuthorData(samplesType, selectData, [, optionalArguments])
-    
+
         Input:
             samplesType (string): 'train', 'valid', 'test' or 'all' to determine
                 from which dataset to get the raw author data from
@@ -697,21 +779,21 @@ class Authorship(_dataForClassification):
                 0 optional arguments: get all the samples from the specified set
                 1 optional argument (int): number of samples to get (at random)
                 1 optional argument (list): specific indices of samples to get
-        
+
         Output:
             Either the WANs or the word frequency count of all the excerpts of
             the selected author
-            
+
     .createGraph(): creates a graph from the WANs of the excerpt written by the
         selected author available in the training set. The fusion of this WANs
-        is done in accordance with the input options following 
+        is done in accordance with the input options following
         graphTools.createGraph().
         The resulting adjacency matrix is stored.
-        
+
     .getGraph(): fetches the stored adjacency matrix and returns it
-    
+
     .getFunctionWords(): fetches the list of functional words. Returns a tuple
-        where the first element correspond to all the functional words in use, 
+        where the first element correspond to all the functional words in use,
         and the second element consists of all the functional words available.
         Obs.: When we created the graph, some of the functional words might have
         been dropped in order to make it connected, for example.
@@ -729,7 +811,7 @@ class Authorship(_dataForClassification):
             labels (dtype.array): numberSamples
             >> Obs.: The 0th dimension matches the corresponding signal to its
                 respective label
-                
+
     .expandDims(): Adds the feature dimension to the graph signals (i.e. for
         graph signals of shape nSamples x nNodes, turns them into shape
         nSamples x 1 x nNodes, so that they can be handled by general graph
@@ -755,7 +837,7 @@ class Authorship(_dataForClassification):
         Output:
             errorRate (float): proportion of incorrect labels
     """
-    
+
     def __init__(self, authorName, ratioTrain, ratioValid, dataPath,
                  graphNormalizationType, keepIsolatedNodes,
                  forceUndirected, forceConnected,
@@ -798,7 +880,7 @@ class Authorship(_dataForClassification):
         self.nTrain = round(2 * nTrainAuthor)
         self.nValid = round(2 * nValidAuthor)
         self.nTest = round(2 * nTestAuthor)
-        
+
         # Now, let's get the corresponding signals for the author
         xAuthor = thisAuthorData['wordFreq']
         # Get a random permutation of these works, and split them accordingly
@@ -854,7 +936,7 @@ class Authorship(_dataForClassification):
         xRestTrain = xRest[randPerm[0:nTrainRest], :]
         xRestValid = xRest[randPerm[nTrainRest:nTrainRest + nValidRest], :]
         xRestTest = xRest[randPerm[nTrainRest+nValidRest:nExcerpts], :]
-        # Now construct the signals and labels. Signals is just the 
+        # Now construct the signals and labels. Signals is just the
         # concatenation of each of these excerpts. Labels is just a bunch of
         # 1s followed by a bunch of 0s
         # Obs.: The fact that the dataset is ordered now, it doesn't matter,
@@ -880,7 +962,7 @@ class Authorship(_dataForClassification):
         # Change data to specified type and device
         self.astype(self.dataType)
         self.to(self.device)
-        
+
     def loadData(self, dataPath):
         # Load data (from a .mat file)
         rawData = hdf5storage.loadmat(dataPath)
@@ -889,7 +971,7 @@ class Authorship(_dataForClassification):
         #   'all_freqs': contains the word frequency count for each excerpt
         #   'all_wans': contains the WANS for each excerpt
         #   'function_words': a list of the functional words
-        # The issue is that hdf5storage, while necessary to load old 
+        # The issue is that hdf5storage, while necessary to load old
         # Matlab(R) files, gives the data in a weird format, that we need
         # to adapt and convert.
         # The data will be structured as follows. We will have an
@@ -902,23 +984,23 @@ class Authorship(_dataForClassification):
         for it in range(len(rawData['all_authors'])):
             thisAuthor = str(rawData['all_authors'][it][0][0][0])
             # Each element in rawData['all_authors'] is nested in a couple
-            # of lists, so that's why we need the three indices [0][0][0] 
+            # of lists, so that's why we need the three indices [0][0][0]
             # to reach the string with the actual author name.
             # Get the word frequency
             thisWordFreq = rawData['all_freqs'][0][it] # 1 x nWords x nData
             # Again, the [0] is due to the structure of the data
             # Let us get rid of that extra 1, and then transpose this to be
-            # stored as nData x nWords (since nWords is the dimension of 
+            # stored as nData x nWords (since nWords is the dimension of
             # the number of nodes the network will have; CS notation)
             thisWordFreq = thisWordFreq.squeeze(0).T # nData x nWords
             # Finally, get the WANs
             thisWAN = rawData['all_wans'][0][it] # nWords x nWords x nData
             thisWAN = thisWAN.transpose(2, 0, 1) # nData x nWords x nWords
-            # Obs.: thisWAN is likely not symmetric, so the way this is 
+            # Obs.: thisWAN is likely not symmetric, so the way this is
             # transposed matters. In this case, since thisWAN was intended
-            # to be a tensor in matlab (where the last index is the 
+            # to be a tensor in matlab (where the last index is the
             # collection of matrices), we just throw that last dimension to
-            # the front (since numpy consider the first index as the 
+            # the front (since numpy consider the first index as the
             # collection index).
             # Now we can create the dictionary and save the corresopnding
             # data.
@@ -933,7 +1015,7 @@ class Authorship(_dataForClassification):
         self.authorData = authorData
         self.allFunctionWords = functionWords
         self.functionWords = functionWords.copy()
-        
+
     def getAuthorData(self, samplesType, dataType, *args):
         # dataType: train, valid, test
         # args: 0 args, give back all
@@ -984,9 +1066,9 @@ class Authorship(_dataForClassification):
                     x = xNew.reshape(newShape)
 
         return x
-    
+
     def createGraph(self):
-        
+
         # Save list of nodes to keep to later update the datasets with the
         # appropriate words
         nodesToKeep = []
@@ -1024,15 +1106,15 @@ class Authorship(_dataForClassification):
 
         if self.allFunctionWords is not None:
             self.functionWords = [self.allFunctionWords[w] for w in nodesToKeep]
-        
+
     def getGraph(self):
-        
+
         return self.adjacencyMatrix
-    
+
     def getFunctionWords(self):
-        
+
         return self.functionWords, self.allFunctionWords
-    
+
     def astype(self, dataType):
         # This changes the type for the selected author as well as the samples
         for key in self.selectedAuthor.keys():
@@ -1041,12 +1123,12 @@ class Authorship(_dataForClassification):
                                             self.selectedAuthor[key][secondKey],
                                             dataType)
         self.adjacencyMatrix = changeDataType(self.adjacencyMatrix, dataType)
-        
-        # And now, initialize to change the samples as well (and also save the 
+
+        # And now, initialize to change the samples as well (and also save the
         # data type)
         super().astype(dataType)
-        
-    
+
+
     def to(self, device):
         # If the dataType is 'torch'
         if 'torch' in repr(self.dataType):
@@ -1056,11 +1138,11 @@ class Authorship(_dataForClassification):
                 for secondKey in self.selectedAuthor[key].keys():
                     self.selectedAuthor[key][secondKey] \
                                 = self.selectedAuthor[key][secondKey].to(device)
-            self.adjacencyMatrix.to(device)                 
+            self.adjacencyMatrix.to(device)
             # And call the inherit method to initialize samples (and save to
             # device)
             super().to(device)
-            
+
 class MovieLens(_data):
     """
     MovieLens: Loads and handles handles the MovieLens-100k dataset
@@ -1068,7 +1150,7 @@ class MovieLens(_data):
         The setting is that of regression on a specific node of the graph. That
         is, given a graph, and an incomplete graph signal on that graph, we want
         to estimate the value of the signal on a specific node.
-        
+
         If, for instance, we have a movie-based graph, then the graph signal
         corresponds to the ratings that a given user gave to some of the movies.
         The objective is to estimate how that particular user would rate one
@@ -1079,9 +1161,9 @@ class MovieLens(_data):
 
     Input:
         graphType('user' or 'movie'): which underlying graph to build; 'user'
-            for user-based graph (each node is a user), and 'movie' for 
+            for user-based graph (each node is a user), and 'movie' for
             movie-based (each node is a movie); this also determines the data,
-            on a user-based graph, each data sample (each graph signal) 
+            on a user-based graph, each data sample (each graph signal)
             corresponds to a movie, and on the movie-based graph, each data
             sample corresponds to a user.
         labelID (list of int or 'all'): these are the specific nodes on which
@@ -1099,7 +1181,7 @@ class MovieLens(_data):
         forceConnected (bool): If True, ensure that the resulting graph is
             connected
         kNN (int): sparsify this graph keeping kNN nearest neighbors
-        maxNodes (int, default: None): consider only the maxNodes nodes with 
+        maxNodes (int, default: None): consider only the maxNodes nodes with
             largest number of ratings
         minRatings (int, default: 0): get rid of all columns and rows with
             less than minRatings ratings (for minRatings = 0, just keep all
@@ -1107,11 +1189,11 @@ class MovieLens(_data):
         interpolate (bool, default: False): if True, interpolates the matrix by
             means of a nearest-neighbor rule before creating the graph signals
             (i.e. all the graph signals will have complete ratings)
-            >> Obs.: Just using these signals to interpolate the remaining 
+            >> Obs.: Just using these signals to interpolate the remaining
                 rating can be interpreted as a typical baseline.
         dataType (dtype): type of loaded data (default: np.float64)
         device (device): where to store the data (e.g., 'cpu', 'cuda:0', etc.)
-        
+
     The resulting dataset consists of triads (signal, target, labelID) where:
         - the signal contains the ratings given by some data sample to all nodes
           with a 0 for the rating corresponding to the labelID node (note that,
@@ -1121,43 +1203,43 @@ class MovieLens(_data):
         - labelID is the label of the node whose rating has been removed
         In other words, we want to use signal to estimate the value target at
         the node labelID.
-    
+
     Methods:
-        
+
     .loadData(filename, [dataDir]): loads the data from dataDir (if not
         provided, the internally stored one is used) and saves it as filename;
         if the data has already been processed and saved as 'filename', then
         it will be just loaded.
-        
+
     .createGraph(): creates a graphType-based graph with the previously
-        established options (undirected, isolated, connected, etc.); this graph 
+        established options (undirected, isolated, connected, etc.); this graph
         is always sparsified by means of a nearest-neighbor rule. The graph
         is created containing only data samples in the training set.
-        
+
     .interpolateRatings(): uses a nearest-neighbor rule to interpolate the
         ratings in the graph signal; this means that all zero values that do not
-        correspond to labelID are replaced by the average of ratings of the 
+        correspond to labelID are replaced by the average of ratings of the
         closest neighbors with nonzero ratings.
-    
+
     .getGraph(): fetches the adjacency matrix of the stored graph.
-    
+
     .getIncompleteMatrix(): fetches the incomplete matrix as it was loaded
         from the data.
-        
+
     .getMovieTitles(): fetches a dictionary, where each key is the movieID
         (starting from zero, so that it matches the index of the columns of
-        the incomplete matrix; subtract 1 from the movieID of movieLens to 
+        the incomplete matrix; subtract 1 from the movieID of movieLens to
         get this movieID) and each value is the title of the movie (in string
         format).
-        
-    .getLabelID(): the index of the node whose data will be regressed; this 
+
+    .getLabelID(): the index of the node whose data will be regressed; this
         might differ from the input labelID in that: its count starts from zero,
         its count might have been modified after getting rid of nodes in order
         to build a graph with the desired characteristics
-        
-    .evaluate(yHat, y): computes the RMSE between the estimated ratings yHat 
+
+    .evaluate(yHat, y): computes the RMSE between the estimated ratings yHat
         and the actual ratings given in y.
-        
+
     lossValue = .evaluate(yHat, y)
         Input:
             yHat (dtype.array): estimated target
@@ -1177,7 +1259,7 @@ class MovieLens(_data):
                 'cuda:0', etc.)
 
     """
-    
+
     def __init__(self, graphType, labelID, ratioTrain, ratioValid, dataDir,
                  keepIsolatedNodes, forceUndirected, forceConnected, kNN,
                  maxNodes = None,
@@ -1185,14 +1267,14 @@ class MovieLens(_data):
                  minRatings = 0,
                  interpolate = False,
                  dataType = np.float64, device = 'cpu'):
-        
+
         super().__init__()
         # This creates the attributes: dataType, device, nTrain, nTest, nValid,
-        # and samples, and fills them all with None, and also creates the 
+        # and samples, and fills them all with None, and also creates the
         # methods: getSamples, astype, and to.
         self.dataType = dataType
         self.device = device
-        
+
         # Store attributes
         #   GraphType
         assert graphType == 'user' or graphType == 'movie'
@@ -1201,7 +1283,7 @@ class MovieLens(_data):
         self.graphType = graphType
         #   Label ID
         assert type(labelID) is list or labelID == 'all'
-        # Label ID is the user ID or the movie ID following the MovieLens 
+        # Label ID is the user ID or the movie ID following the MovieLens
         # nomenclature. This determines how we build the labels in the
         # dataset. If it's all, then we want to estimate for all users/movies.
         #   Dataset partition
@@ -1219,7 +1301,7 @@ class MovieLens(_data):
         self.maxNodes = maxNodes
         #   Discard samples with less than minRatings ratings
         self.minRatings = minRatings
-        #   Interpolate nonexisting ratings (i.e. get rid of zeros and replace 
+        #   Interpolate nonexisting ratings (i.e. get rid of zeros and replace
         #   them by the nearest neighbor rating)
         self.doInterpolate = interpolate
         #   Empty attributes for now
@@ -1227,13 +1309,13 @@ class MovieLens(_data):
         self.movieTitles = {}
         self.adjacencyMatrix = None
         self.indexDataPoints = {}
-        
-        # Now, we should be ready to load the data and build the (incomplete) 
+
+        # Now, we should be ready to load the data and build the (incomplete)
         # matrix
         self.loadData('movielens100kIncompleteMatrix.pkl')
         # This has loaded the incompleteMatrix and movieTitles attributes.
-        
-        # First check if we might need to get rid of columns and rows to get 
+
+        # First check if we might need to get rid of columns and rows to get
         # the minimum number of ratings requested
         if self.minRatings > 0:
             incompleteMatrix = self.incompleteMatrix
@@ -1252,8 +1334,8 @@ class MovieLens(_data):
                            incompleteMatrix[indexRowsToKeep][:, indexColsToKeep]
             # Store it
             self.incompleteMatrix = incompleteMatrix
-            
-            # Also, we need to consider that, if we have the movie graph, 
+
+            # Also, we need to consider that, if we have the movie graph,
             # then we need to update the movie list as well (all the columns
             # we lost -the nodes we lost- are part of a movie list that
             # has a one-to-one correspondence)
@@ -1274,7 +1356,7 @@ class MovieLens(_data):
             # If there was no need to reduce the columns or rows
             indexRowsToKeep = np.arange(self.incompleteMatrix.shape[0])
             indexColsToKeep = np.arange(self.incompleteMatrix.shape[1])
-        
+
         # To simplify code, we will work always with each row being a data
         # sample. The incompleteMatrix is User x Movies
         if graphType == 'user':
@@ -1299,7 +1381,7 @@ class MovieLens(_data):
             workingMatrix = self.incompleteMatrix.T # Movies x User
             # Which one correspond to the nodes
             indexNodesToKeep = indexRowsToKeep
-            
+
             # Now, each row is a movie score for all users, so that it is a
             # graph signal in the user-based graph.
         else:
@@ -1314,18 +1396,18 @@ class MovieLens(_data):
             # and this is the kind of data samples we need for movie-based
             # graphs
             indexNodesToKeep = indexColsToKeep
-        
+
         # Determine the number of nodes
         nNodes = workingMatrix.shape[1]
-        
+
         assert len(indexNodesToKeep) == nNodes
-        
+
         # And we need to map the original IDs to the new ones (note that
         # each column is a node now -each row is a graph signal- so we
         # care about matching the labels to the corresponding new ones)
         #   First check, that, unless we wanted all indices (so we don't
         #   care much about the ones we just dropped), we have them in the
-        #   new indices (i.e. we didn't drop them)        
+        #   new indices (i.e. we didn't drop them)
         if labelID != 'all':
             # For each of the introduced IDs, check:
             self.labelID = np.empty(0, dtype = np.int)
@@ -1337,10 +1419,10 @@ class MovieLens(_data):
                 self.labelID = np.concatenate((self.labelID, newIndex))
         else:
             self.labelID = np.arange(nNodes)
-        
+
         # Up to this point, we just have an array of IDs of nodes we care about
         # This could be all, one or a few, but is a numpy.array
-        
+
         # So, now we just select a number of rows (graph signals) at random
         # to make the train and valid and test set. But we need to keep
         # track of the ID (the node)
@@ -1351,15 +1433,15 @@ class MovieLens(_data):
         # train and test set. In other words, the rows determine the graph
         # signals, and all the nonzero elements of each row will make up
         # for the points in each training set.
-            
+
         # Next we reduce the size of the matrix to the ones that we are
         # interested in
         selectedMatrix = workingMatrix[:, self.labelID]
-        
+
         # So far we've got the value of all graph signals only on the nodes
         # of interest (some of these might just be zero, if the nodes of
         # interest weren't rated by that given graph signal)
-        
+
         # Get rid of those rows that have no ratings for the labels of
         # interest
         #   We sum all the rows: since all the ratings are positive, those
@@ -1367,7 +1449,7 @@ class MovieLens(_data):
         nonzeroRows = np.sum(selectedMatrix, axis = 1)
         nonzeroRows = np.nonzero(nonzeroRows)[0]
         selectedMatrix = selectedMatrix[nonzeroRows,:]
-        
+
         # Now, we move on to count the total number of graph signals that
         # we have (number of rows)
         nRows = selectedMatrix.shape[0]
@@ -1380,9 +1462,9 @@ class MovieLens(_data):
         # The point of this is that each row might have more than one
         # data point: i.e. some graph signal might have rated more than one
         # of the nodes of interest; therefore this would amount to having
-        # more than one data point stemming from that graph signal -by 
+        # more than one data point stemming from that graph signal -by
         # zero-ing out each of the nodes separately-
-        #   Total number of available samples (whether to take the 0 or the 
+        #   Total number of available samples (whether to take the 0 or the
         #   1 element of the set is indistinct, they both have the same len)
         nDataPoints = len(np.nonzero(selectedMatrix)[0])
         #   Check if the total number of desired samples has been defined
@@ -1391,7 +1473,7 @@ class MovieLens(_data):
         #   running a faster training)
         if maxDataPoints is None:
             maxDataPoints = nDataPoints
-        #   and if it was designed, if it is not greater than the total 
+        #   and if it was designed, if it is not greater than the total
         #   number of data points available
         elif maxDataPoints > nDataPoints:
             maxDataPoints = nDataPoints
@@ -1401,9 +1483,9 @@ class MovieLens(_data):
         nValid = round(ratioValid * nTrain)
         nTrain = nTrain - nValid
         nTest = maxDataPoints - nTrain - nValid
-        
+
         # TODO: There has to be a way of accelerating this thing below
-        
+
         # Training count
         nTrainSoFar = 0
         rowCounter = 0
@@ -1426,7 +1508,7 @@ class MovieLens(_data):
             thisLabels = thisRow[thisNZcols]
             # Get the signals
             thisSignals = workingMatrix[nonzeroRows[randPerm[rowCounter]],:]
-            # From this signal (taken from the original working matrix) we 
+            # From this signal (taken from the original working matrix) we
             # will obtain as many signals as nonzero ratings of the nodes of
             # interest. Therefore, we need to repeat it to that point
             thisSignals = np.tile(thisSignals, [thisNpoints, 1])
@@ -1449,7 +1531,7 @@ class MovieLens(_data):
         # We also want to know which rows we have selected so far
         indexTrainPoints = nonzeroRows[randPerm[0:rowCounter]]
         nRowsTrain = rowCounter
-        
+
         # Now, repeat for validation set:
         nValidSoFar = 0
         rowCounter = nRowsTrain # Initialize where the other one left off
@@ -1472,7 +1554,7 @@ class MovieLens(_data):
             thisLabels = thisRow[thisNZcols]
             # Get the signals
             thisSignals = workingMatrix[nonzeroRows[randPerm[rowCounter]],:]
-            # From this signal (taken from the original working matrix) we 
+            # From this signal (taken from the original working matrix) we
             # will obtain as many signals as nonzero ratings of the nodes of
             # interest. Therefore, we need to repeat it to that point
             thisSignals = np.tile(thisSignals, [thisNpoints, 1])
@@ -1495,7 +1577,7 @@ class MovieLens(_data):
         # We also want to know which rows we have selected so far
         indexValidPoints = nonzeroRows[randPerm[nRowsTrain:rowCounter]]
         nRowsValid = rowCounter - nRowsTrain
-        
+
         # And, finally the test set
         nTestSoFar = 0
         rowCounter = nRowsTrain + nRowsValid
@@ -1518,7 +1600,7 @@ class MovieLens(_data):
             thisLabels = thisRow[thisNZcols]
             # Get the signals
             thisSignals = workingMatrix[nonzeroRows[randPerm[rowCounter]],:]
-            # From this signal (taken from the original working matrix) we 
+            # From this signal (taken from the original working matrix) we
             # will obtain as many signals as nonzero ratings of the nodes of
             # interest. Therefore, we need to repeat it to that point
             thisSignals = np.tile(thisSignals, [thisNpoints, 1])
@@ -1540,15 +1622,15 @@ class MovieLens(_data):
         self.nTest = len(testLabels)
         # We also want to know which rows we have selected so far
         indexTestPoints=nonzeroRows[randPerm[nRowsTrain+nRowsValid:rowCounter]]
-        
+
         # And we also need all the data points (all the rows), so:
         indexDataPoints = np.concatenate((indexTrainPoints,
                                           indexValidPoints,
                                           indexTestPoints))
-        
+
         # Now, this finalizes the data split, now, so we have all we need:
         # signals, labels, and IDs.
-                
+
         # So far, either by selecting a node, or by selecting all nodes, we
         # have the variables we need: signals, labels, IDs and index points.
         self.samples['train']['signals'] = trainSignals
@@ -1566,21 +1648,21 @@ class MovieLens(_data):
         self.indexDataPoints['train'] = indexTrainPoints
         self.indexDataPoints['valid'] = indexValidPoints
         self.indexDataPoints['test'] = indexTestPoints
-            
+
         # Now the data has been loaded, and the training/test partition has been
         # made, create the graph
         self.createGraph()
         # Observe that this graph also adjusts the signals to reflect any change
         # in the number of nodes
-        
+
         # Finally, check if we want to interpolate the useless zeros
         if self.doInterpolate:
             self.interpolateRatings()
-        
+
         # Change data to specified type and device
         self.astype(self.dataType)
         self.to(self.device)
-        
+
     def loadData(self, filename, *args):
         # Here we offer the option of including an additional dir, if not, use
         # the internally stored one.
@@ -1589,7 +1671,7 @@ class MovieLens(_data):
         else:
             assert self.dataDir is not None
             dataDir = self.dataDir
-        
+
         # Check if the dataDir exists, and if not, create it
         if not os.path.exists(dataDir):
             os.makedirs(dataDir)
@@ -1604,7 +1686,7 @@ class MovieLens(_data):
                 self.incompleteMatrix = datasetDict['incompleteMatrix']
                 self.movieTitles = datasetDict['movieTitles']
         else: # If it doesn't exist, load it
-            # There could be three options here: that we have the raw data 
+            # There could be three options here: that we have the raw data
             # already there, that we have the zip file and need to decompress it,
             # or that we do not have nothing and we need to download it.
             existsRawData = \
@@ -1666,7 +1748,7 @@ class MovieLens(_data):
             # Now that we have created the matrix, we store it
             self.incompleteMatrix = rawMatrix
             # And we move to load the movie names
-            
+
             with open(rawMovieListFilename, 'r', encoding = "ISO-8859-1") \
                     as rawMovieList:
                 # Go line by line (each line corresponds to a movie)
@@ -1685,12 +1767,12 @@ class MovieLens(_data):
                          'movieTitles': self.movieTitles},
                         datasetFile
                         )
-    
+
     def createGraph(self):
         # Here we can choose to create the movie or the user graph.
         # Let's start with the incomplete matrix, and get randomly some of the
         # elements from it to use as training data to build the graph.
-        
+
         # Recall that the datapoints that I have already split following the
         # user/movie ID selection (or 'all' for all it matters) have to be
         # taken into account. So, check that this points have been determined
@@ -1700,8 +1782,8 @@ class MovieLens(_data):
         assert 'test' in self.indexDataPoints.keys()
         assert self.nTrain is not None \
                 and self.nValid is not None \
-                and self.nTest is not None            
-        
+                and self.nTest is not None
+
         # To follow the paper by Huang et al., where the data is given by
         # Y in U x M, and goes into full detail on how to build the U x U
         # user-based graph, then, we will stick with this formulation
@@ -1714,29 +1796,29 @@ class MovieLens(_data):
         # to be rows and the data to build the graph was therefore in columns;
         # in this case, it is the opposite, since we still want to use the data
         # located in the rows.
-        
+
         # Now, the indices in self.indexDataPoints, essentially determine the
         # data samples (the graph signals) that we put in each set. Now, these
         # graph signals are now the columns, because the nodes are the rows.
         # So, these indexDataPoints are the columns in the new workingMatrix.
-        
+
         # In essence, we need to add more points to complete the train set, but
         # to be sure that (i) these points are not the ones in the valid and
         # test sets, and (ii) that the training points are included already.
-        
+
         # Now, out of all possible graph signals (number of columns in this
         # workingMatrix), we have selected some of those to be part of the
         # training set. But each  of these graph signals, have a different
         # number of traning points (because they have a different number of
         # nonzero elements). And we only care, when building the graph, on the
         # nonzero elements of the graph signals.
-        
+
         # So, let's count the number of training points that we actually have
         # To do this, we count the number of nonzero elements in the samples
         # that we have selected
         trainSamples = self.indexDataPoints['train']
         nTrainPointsActual = len(np.nonzero(workingMatrix[:, trainSamples])[0])
-        # And the total number of points that we have already partitioned into 
+        # And the total number of points that we have already partitioned into
         # the different sets
         validSamples = self.indexDataPoints['valid']
         nValidPointsActual = len(np.nonzero(workingMatrix[:, validSamples])[0])
@@ -1744,7 +1826,7 @@ class MovieLens(_data):
         nTestPointsActual = len(np.nonzero(workingMatrix[:, testSamples])[0])
         # Total number of points already considered
         nPointsActual = nTrainPointsActual+nValidPointsActual+nTestPointsActual
-        
+
         # The total number of data points in the entire dataset is
         indexDataPoints = np.nonzero(workingMatrix)
         # This is a tuple, where the first element is the place of nonzero
@@ -1754,27 +1836,27 @@ class MovieLens(_data):
         # Note that every nonzero point belonging to labelID has already been
         # assigned to either one or the other dataset, so when we split
         # these datasets, we cannot consider these.
-        
+
         # The total number of expected training points is
         nTrainPointsAll = int(round(self.ratioTrain * nDataPoints))
         #   Discard the (expected) number of validation points
         nTrainPointsAll = int(nTrainPointsAll\
                                         -round(self.ratioValid*nTrainPointsAll))
-        
-        # Now, we only need to add more points if the expected number of 
+
+        # Now, we only need to add more points if the expected number of
         # training points is greater than the ones we still have.
-        
+
         # If we have more training points than what we originally intended, we
         # just use those (they will be part of the training samples regardless)
         # This could happen, for instance, if by chances, the graph signals
         # picked for training set are the more dense ones, giving a lot of
         # training points: nTrainPointsAll > nTrainPointsActual
-        
+
         # Likewise, if we do not have any more points to take from (because all
         # the other graph signals have already been taken for validation and
         # test set), we can proceed to get the remaining needed points:
         # nPointsActual < nDataPoints
-        
+
         if nTrainPointsAll > nTrainPointsActual and nPointsActual < nDataPoints:
             # So, now, the number of points that we still need to get are
             nTrainPointsRest = nTrainPointsAll - nTrainPointsActual
@@ -1782,7 +1864,7 @@ class MovieLens(_data):
             # can get the samples from (it cannot be samples that have already
             # been considered in any of the graph signals)
             nTotalCols = workingMatrix.shape[1] # Total number of columns
-            # Note that self.indexDataPoints['all'] has all the columns that 
+            # Note that self.indexDataPoints['all'] has all the columns that
             # have already been selected. So the remaining columns are the ones
             # that are not there
             indexRemainingCols = [i for i in range(nTotalCols) \
@@ -1791,12 +1873,12 @@ class MovieLens(_data):
             # So the total number of points left is
             indexDataPointsRest=np.nonzero(workingMatrix[:,indexRemainingCols])
             nDataPointsRest = len(indexDataPointsRest[0])
-            # Now, check that we have enough points to complete the total 
+            # Now, check that we have enough points to complete the total
             # desired. If not, just use all of them
             if nDataPointsRest < nTrainPointsRest:
                 nTrainPointsRest = nDataPointsRest
-            
-            # Now, we need to select at random from these points, those that 
+
+            # Now, we need to select at random from these points, those that
             # will be part of the training set to build the graph.
             randPerm = np.random.permutation(nDataPointsRest)
             # Pick the needed number of subindices
@@ -1812,7 +1894,7 @@ class MovieLens(_data):
             # So, so far, we have all the needed training points: (i) those in
             # the original training set, and (ii) those in the remaining graph
             # signals to complete the number of desired training points.
-            
+
             # Now, we need to merge these points with the ones already in the
             # training set of graph signals
             indexTrainPointsID = np.nonzero(
@@ -1830,7 +1912,7 @@ class MovieLens(_data):
             indexTrainPoints = np.nonzero(
                                 workingMatrix[:, self.indexDataPoints['train']])
             # But the columns in this indexTrainPoints, are actually the
-            # columns of the smaller matrix evaluated only on 
+            # columns of the smaller matrix evaluated only on
             # self.indexDataPoints['train']. So we need to map it into the
             # full column numbers
             indexTrainPoints = (
@@ -1839,28 +1921,28 @@ class MovieLens(_data):
                                 )
             # And state that there are no new extra points
             nTrainPointsRest = 0
-        
+
         # Record the actual number of training points that we are left with
         nTrainPoints = len(indexTrainPoints[0])
         assert nTrainPoints == nTrainPointsRest + nTrainPointsActual
-        
+
         # And this is it! We got all the necessary training samples, including
         # those that we were already using.
-        
-        # Finally, set every other element not in the training set in the 
+
+        # Finally, set every other element not in the training set in the
         # workingMatrix to zero
-        workingMatrixZeroedTrain = workingMatrix.copy()      
+        workingMatrixZeroedTrain = workingMatrix.copy()
         workingMatrixZeroedTrain[indexTrainPoints] = 0.
         workingMatrix = workingMatrix - workingMatrixZeroedTrain
         assert len(np.nonzero(workingMatrix)[0]) == nTrainPoints
         # To check that the total number of nonzero elements of the matrix are
         # the total number of training samples that we're supposed to have.
-        
+
         # Now, we finally have the incompleteMatrix only with the corresponding
         # elements: a ratioTrain proportion of training samples that, for sure,
-        # include the ones that we will use in the graph signals dataset and, 
+        # include the ones that we will use in the graph signals dataset and,
         # for sure, exclude those that are in the validation and test sets.
-       
+
         # Finally, on to compute the correlation matrix.
         # The mean required for the (u,v)th element of the correlation matrix is
         # the sum of the ratings for row u, but only in those columns where
@@ -1891,7 +1973,7 @@ class MovieLens(_data):
         # mu_{uv} = 1/|S_{uv}| * \sum_{i \in S_{uv}} Y_{ui}
         # Since the sum is of elements u, when we compute mu_{vu} we will get
         # a different sum
-        
+
         # Now, to compute the correlation, we need to compute the square sum
         # matrix \sum_{i \in S_{uv}} Y_{ui}^{2}
         sqSumMatrix = (workingMatrix ** 2).dot(binaryTemplate.T)
@@ -1899,7 +1981,7 @@ class MovieLens(_data):
         # 1/|S_{uv}| \sum_{i \in S_{uv}} Y_{ui}^{2} - \mu_{uv}^{2}
         # where \mu_{uv} is the mean we computed before
         correlationMatrix = sqSumMatrix / countMatrix - avgMatrix ** 2
-        
+
         # Finally, normalize the individual user variances and get rid of the
         # identity matrix
         #   Compute the square root of the diagonal elements
@@ -1919,21 +2001,21 @@ class MovieLens(_data):
         normalizedMatrix = normalizationMatrix.dot(
                                 correlationMatrix.dot(normalizationMatrix)) \
                             - np.eye(correlationMatrix.shape[0])
-        #   There could be isolated nodes, which mean that have 0 in the 
+        #   There could be isolated nodes, which mean that have 0 in the
         #   diagonal already, so when subtracting the identity they end up with
         #   -1 in the diagonal element.
         #   If this is the case, we just put back a one in those nodes. But the
         #   real problem, comes if the labelID is within those isolated nodes.
-        #   If that's the case, then we just stop the processing, there's 
+        #   If that's the case, then we just stop the processing, there's
         #   nothing else to do.
         diagNormalizedMatrix = np.diag(np.diag(normalizedMatrix))
         isolatedNodes = np.nonzero(np.abs(diagNormalizedMatrix + 1) \
                                                                 < zeroTolerance)
         normalizedMatrix[isolatedNodes] = 0.
-        #   Get rid of the "quasi-zeros" that could have arrived through 
+        #   Get rid of the "quasi-zeros" that could have arrived through
         #   division.
         normalizedMatrix[np.abs(normalizedMatrix) < zeroTolerance] = 0.
-        
+
         # Finally, create the graph
         #   Number of nodes so far
         N = normalizedMatrix.shape[0]
@@ -1944,7 +2026,7 @@ class MovieLens(_data):
         #   be enforced on the graph
         nodesToKeep = [] # List of nodes to keep after some of them might have
         #   been removed to satisfy the constraints
-        extraComponents= [] # List where we save the rest of the isolated 
+        extraComponents= [] # List where we save the rest of the isolated
         # components, if there where
         W = graph.createGraph('fuseEdges', N,
                               {'adjacencyMatrices': normalizedMatrix,
@@ -1955,20 +2037,20 @@ class MovieLens(_data):
                                'forceConnected': self.forceConnected,
                                'nodeList': nodesToKeep,
                                'extraComponents': extraComponents})
-        # So far, the matrix output is the adjacency matrix of the largest 
+        # So far, the matrix output is the adjacency matrix of the largest
         # connected component, and nodesToKeep refer to those nodes.
-        
+
         # At this point, it can happen that some (or all) of the selected nodes
         # are not in the graph. If none of the selected nodes is there, we
         # should stop (we have no useful problem anymore)
-        
+
         IDnodesKept = 0 # How many of the selected ID nodes are we keeping
         for i in self.labelID:
             if i in nodesToKeep:
                 IDnodesKept += 1
-        
+
         assert IDnodesKept > 0
-        
+
         #   Update samples and labelID, if necessary
         if len(nodesToKeep) < N:
             # Update the node IDs
@@ -1984,7 +2066,7 @@ class MovieLens(_data):
             testLabels = self.samples['test']['targets']
             #   Update the ID
             #   Train set
-            trainIDsToKeep = [] # which samples from the train set we need to 
+            trainIDsToKeep = [] # which samples from the train set we need to
                 # keep (note that if some of the nodes that were labeled in the
                 # trainIDs have been vanished, then we need to get rid of those
                 # training samples)
@@ -1993,7 +2075,7 @@ class MovieLens(_data):
             for i in range(len(trainIDs)):
                 # If the train ID of the sample is in nodes to keep
                 if trainIDs[i] in nodesToKeep:
-                    # We need to add it to the list of nodes to keep (what 
+                    # We need to add it to the list of nodes to keep (what
                     # position in the training samples are, because those that
                     # are not there also have to be discarded from the rating)
                     trainIDsToKeep.append(i)
@@ -2020,7 +2102,7 @@ class MovieLens(_data):
                     newTestIDs.append(nodesToKeep.index(testIDs[i]))
             testIDsToKeep = np.array(testIDsToKeep) # Convert to numpy
             newTestIDs = np.array(newTestIDs) # Conver to numpy
-            
+
             # And, finally, we update the signals
             trainSignals = trainSignals[trainIDsToKeep][:, nodesToKeep]
             validSignals = validSignals[validIDsToKeep][:, nodesToKeep]
@@ -2062,18 +2144,18 @@ class MovieLens(_data):
                         newMovieID = newMovieID + 1
                     # Update movieList
                     self.movieTitles = movieTitles
-                
+
         #   And finally, sparsify it (nearest neighbors)
         self.adjacencyMatrix = graph.sparsifyGraph(W, 'NN', self.kNN)
-        
+
     def interpolateRatings(self):
         # For the nonzero nodes, we will average the value of the closest
         # nonzero elements.
-        
+
         # So we need to find the neighborhood, iteratively, until we find a
         # nodes in the neighborhood that have nonzero elements. And then
         # average those.
-        
+
         # There are three sets of signals, so for each one of them
         for key in self.samples.keys():
             # Get the signals
@@ -2085,11 +2167,11 @@ class MovieLens(_data):
             zeroLocations = np.nonzero(np.abs(thisSignal) < zeroTolerance)
             # This is a tuple with two elements, each element is a 1-D np.array
             # with the rows and column indices of the zero elements, respectiv
-            # The columns are the nodes, so we should iterate by nodes. The 
+            # The columns are the nodes, so we should iterate by nodes. The
             # problem is that I do not want to go ahead finding the neighborhood
             # each time, and I do not want to go ahead element by element, I
             # want to go node by node, so that I have to do at most N searches
-            
+
             # Not a good idea. Let's do it by neighborhood, since I can get
             # all neighbors at once
             # If there are zero locations that need to be interpolated
@@ -2115,14 +2197,14 @@ class MovieLens(_data):
                 nbList = graph.computeNeighborhood(A, K, N = len(zeroNodes))
                 # This is a list of lists. Each node has associated a list of
                 # neighboring nodes.
-                # But the index of this neighboring nodes is not correct, 
-                # because it belongs to the allNodes ordering and not the 
+                # But the index of this neighboring nodes is not correct,
+                # because it belongs to the allNodes ordering and not the
                 # original one.
-                #   
+                #
                 # Go for each node, and pick up the neighboring values
                 # (It is more likely that we will have more samples than
                 # nodes, so it should be faster to iterate through nodes)
-                
+
                 # For each element in the neighborhood list
                 for i in range(len(nbList)):
                     # Get the actual node
@@ -2143,7 +2225,7 @@ class MovieLens(_data):
                     countNZ[countNZ == 0] = 1.
                     #   Compute the average and round to an integer
                     meanSignal = np.round(sumSignal / countNZ)
-                    # And now we need to place this newly computed mean 
+                    # And now we need to place this newly computed mean
                     # signal back in the nonzero elements
                     zeroBatches = zeroLocations[0][zeroLocations[1] == thisNode]
                     # Add it to the signal
@@ -2153,31 +2235,31 @@ class MovieLens(_data):
                 zeroLocations = np.nonzero(np.abs(thisSignal) < zeroTolerance)
                 # and add a new neighborhood
                 K += 1
-            
+
             # And put it back where it goes
             self.samples[key]['signals'] = thisSignal
-        
+
     def getIncompleteMatrix(self):
-        
+
         return self.incompleteMatrix
-    
+
     def getGraph(self):
-        
+
         return self.adjacencyMatrix
-    
+
     def getMovieTitles(self):
-        
+
         return self.movieTitles
-    
+
     def getLabelID(self, *args):
-        
+
         # So, here are the options
         # No arguments: return the list of self.labelID
         # One argument: it has to be samplesType and then return all labelIDs
         # for that sample type
         # Two arguments, can either be list or int, and return at random, like
         # the getSamples() method
-        
+
         if len(args) == 0:
             returnID = self.labelID
         else:
@@ -2186,9 +2268,9 @@ class MovieLens(_data):
             # Check that is one of the possibilities
             assert samplesType == 'train' or samplesType == 'valid' \
                     or samplesType == 'test'
-                    
+
             returnID = self.targetIDs[samplesType]
-            
+
             if len(args) == 2:
                 # If it is an int, just return that number of randomly chosen
                 # IDs
@@ -2203,20 +2285,20 @@ class MovieLens(_data):
                                                        replace = False)
                     # Select the corresponding IDs
                     returnID = returnID[selectedIndices]
-                
+
                 else:
                     # This has to be a list () or an np.array which can serve
                     # as indexing functions
                     returnID = returnID[args[1]]
-        
+
         return returnID
-    
+
     def evaluate(self, yHat, y):
         # y and yHat should be of the same dimension, where dimension 0 is the
         # number of samples
         N = y.shape[0] # number of samples
         assert yHat.shape[0] == N
-        # And now, get rid of any extra '1' dimension that might appear 
+        # And now, get rid of any extra '1' dimension that might appear
         # involuntarily from some vectorization issues.
         y = y.squeeze()
         yHat = yHat.squeeze()
@@ -2225,27 +2307,27 @@ class MovieLens(_data):
         if N == 1:
             y = y.unsqueeze(0)
             yHat = yHat.unsqueeze(0)
-        
+
         # Now, we compute the RMS
         if 'torch' in repr(self.dataType):
             mse = torch.nn.functional.mse_loss(yHat, y)
             rmse = torch.sqrt(mse)
         else:
-            mse = np.mean((yHat - y) ** 2) 
+            mse = np.mean((yHat - y) ** 2)
             rmse = np.sqrt(mse)
-            
+
         return rmse
-    
+
     def astype(self, dataType):
         # This changes the type for the incomplete and adjacency matrix.
         self.incompleteMatrix = changeDataType(self.incompleteMatrix, dataType)
         self.adjacencyMatrix = changeDataType(self.adjacencyMatrix, dataType)
-        
-        # And now, initialize to change the samples as well (and also save the 
+
+        # And now, initialize to change the samples as well (and also save the
         # data type)
         super().astype(dataType)
-        
-    
+
+
     def to(self, device):
         # If the dataType is 'torch'
         if 'torch' in repr(self.dataType):
@@ -2256,20 +2338,20 @@ class MovieLens(_data):
             # And call the inherit method to initialize samples (and save to
             # device)
             super().to(device)
-            
+
 class Flocking(_data):
     """
     Flocking: Creates synthetic trajectories for the problem of coordinating
         a team of robots to fly together while avoiding collisions. See the
         following  paper for details
-        
-        E. Tolstaya, F. Gama, J. Paulos, G. Pappas, V. Kumar, and A. Ribeiro, 
+
+        E. Tolstaya, F. Gama, J. Paulos, G. Pappas, V. Kumar, and A. Ribeiro,
         "Learning Decentralized Controllers for Robot Swarms with Graph Neural
         Networks," in Conf. Robot Learning 2019. Osaka, Japan: Int. Found.
         Robotics Res., 30 Oct.-1 Nov. 2019.
-    
+
     Initialization:
-        
+
     Input:
         nAgents (int): Number of agents
         commRadius (float): communication radius (in meters)
@@ -2293,9 +2375,9 @@ class Flocking(_data):
         dataType (dtype): datatype for the samples created (default: np.float64)
         device (device): if torch.Tensor datatype is selected, this is on what
             device the data is saved (default: 'cpu')
-            
+
     Methods:
-        
+
     signals, targets = .getSamples(samplesType[, optionalArguments])
         Input:
             samplesType (string): 'train', 'valid' or 'test' to determine from
@@ -2309,7 +2391,7 @@ class Flocking(_data):
             targets (dtype.array): numberSamples x 2 x numberNodes
             'signals' are the state variables as described in the corresponding
             paper; 'targets' is the 2-D acceleration for each node
-            
+
     cost = .evaluate(vel = None, accel = None, initVel = None,
                      samplingTime = None)
         Input:
@@ -2330,7 +2412,7 @@ class Flocking(_data):
 
     .to(device): if dtype is torch.tensor, move them to the specified device.
         Input:
-            device (string): target device to move the variables to (e.g. 
+            device (string): target device to move the variables to (e.g.
                 'cpu', 'cuda:0', etc.)
 
     state = .computeStates(pos, vel, graphMatrix, ['doPrint'])
@@ -2344,13 +2426,13 @@ class Flocking(_data):
                 initialization
         Output:
             state (array): states; nSamples x tSamples x 6 x nAgents
-    
+
     graphMatrix = .computeCommunicationGraph(pos, commRadius, normalizeGraph,
                     ['kernelType' = 'gaussian', 'weighted' = False, 'doPrint'])
         Input:
             pos (array): positions; nSamples x tSamples x 2 x nAgents
             commRadius (float): communication radius (in meters)
-            normalizeGraph (bool): if True normalize adjacency matrix by 
+            normalizeGraph (bool): if True normalize adjacency matrix by
                 largest eigenvalue
             'kernelType' ('gaussian'): kernel to apply to the distance in order
                 to compute the weights of the adjacency matrix, default is
@@ -2366,10 +2448,10 @@ class Flocking(_data):
         Output:
             graphMatrix (array): adjacency matrix of the communication graph;
                 nSamples x tSamples x nAgents x nAgents
-    
+
     thisData = .getData(name, samplesType[, optionalArguments])
         Input:
-            name (string): variable name to get (for example, 'pos', 'vel', 
+            name (string): variable name to get (for example, 'pos', 'vel',
                 etc.)
             samplesType ('train', 'test' or 'valid')
             optionalArguments:
@@ -2378,7 +2460,7 @@ class Flocking(_data):
                 1 optional argument (list): specific indices of samples to get
         Output:
             thisData (array): specific type of data requested
-    
+
     pos, vel[, accel, state, graph] = computeTrajectory(initPos, initVel,
                                             duration[, 'archit', 'accel',
                                             'doPrint'])
@@ -2401,7 +2483,7 @@ class Flocking(_data):
             state (array): state; nSamples x tSamples x 6 x nAgents
             graph (array): adjacency matrix of communication graph;
                 nSamples x tSamples x nAgents x nAgents
-            
+
     uDiff, uDistSq = .computeDifferences (u):
         Input:
             u (array): nSamples (x tSamples) x 2 x nAgents
@@ -2410,15 +2492,15 @@ class Flocking(_data):
                 nSamples (x tSamples) x 2 x nAgents x nAgents
             uDistSq (array): squared distances between agent entries of u;
                 nSamples (x tSamples) x nAgents x nAgents
-    
-    pos, vel, accel = .computeOptimalTrajectory(initPos, initVel, duration, 
+
+    pos, vel, accel = .computeOptimalTrajectory(initPos, initVel, duration,
                                                 samplingTime, repelDist,
                                                 accelMax = 100.)
         Input:
             initPos (array): initial positions; nSamples x 2 x nAgents
             initVel (array): initial velocities; nSamples x 2 x nAgents
             duration (float): duration of trajectory (in seconds)
-            samplingTime (float): time elapsed between consecutive time 
+            samplingTime (float): time elapsed between consecutive time
                 instants (in seconds)
             repelDist (float): minimum desired distance between agents (in m)
             accelMax (float, default = 100.): maximum possible acceleration
@@ -2426,7 +2508,7 @@ class Flocking(_data):
             pos (array): positions; nSamples x tSamples x 2 x nAgents
             vel (array): velocities; nSamples x tSamples x 2 x nAgents
             accel (array): accelerations; nSamples x tSamples x 2 x nAgents
-            
+
     initPos, initVel = .computeInitialPositions(nAgents, nSamples, commRadius,
                                                 minDist = 0.1,
                                                 geometry = 'rectangular',
@@ -2443,7 +2525,7 @@ class Flocking(_data):
         Output:
             initPos (array): initial positions; nSamples x 2 x nAgents
             initVel (array): initial velocities; nSamples x 2 x nAgents
-    
+
     .saveVideo(saveDir, pos, [, optionalArguments], commGraph = None,
                [optionalKeyArguments])
         Input:
@@ -2472,10 +2554,10 @@ class Flocking(_data):
                 will show the instantaneous cost (default: True)
             'showArrows' (bool): if True and velocities are set, the snapshots
                 will show the arrows of the velocities (default: True)
-            
-            
+
+
     """
-    
+
     def __init__(self, nAgents, commRadius, repelDist,
                  nTrain, nValid, nTest,
                  duration, samplingTime,
@@ -2483,7 +2565,7 @@ class Flocking(_data):
                  accelMax = 10.,
                  normalizeGraph = True, doPrint = True,
                  dataType = np.float64, device = 'cpu'):
-        
+
         # Initialize parent class
         super().__init__()
         # Save the relevant input information
@@ -2513,7 +2595,7 @@ class Flocking(_data):
         self.device = device
         #   Options
         self.doPrint = doPrint
-        
+
         #   Places to store the data
         self.initPos = None
         self.initVel = None
@@ -2522,10 +2604,10 @@ class Flocking(_data):
         self.accel = None
         self.commGraph = None
         self.state = None
-        
+
         if self.doPrint:
             print("\tComputing initial conditions...", end = ' ', flush = True)
-        
+
         # Compute the initial positions
         initPosAll, initVelAll = self.computeInitialPositions(
                                           self.nAgents, nSamples, self.commRadius,
@@ -2534,53 +2616,53 @@ class Flocking(_data):
                                           xMaxInitVel = self.initVelValue,
                                           yMaxInitVel = self.initVelValue
                                                               )
-        #   Once we have all positions and velocities, we will need to split 
+        #   Once we have all positions and velocities, we will need to split
         #   them in the corresponding datasets (train, valid and test)
         self.initPos = {}
         self.initVel = {}
-        
+
         if self.doPrint:
             print("OK", flush = True)
             # Erase the label first, then print it
             print("\tComputing the optimal trajectories...",
                   end=' ', flush=True)
-        
+
         # Compute the optimal trajectory
         posAll, velAll, accelAll = self.computeOptimalTrajectory(
                                         initPosAll, initVelAll, self.duration,
                                         self.samplingTime, self.repelDist,
                                         accelMax = self.accelMax)
-        
+
         self.pos = {}
         self.vel = {}
         self.accel = {}
-        
+
         if self.doPrint:
             print("OK", flush = True)
             # Erase the label first, then print it
             print("\tComputing the communication graphs...",
                   end=' ', flush=True)
-        
+
         # Compute communication graph
         commGraphAll = self.computeCommunicationGraph(posAll, self.commRadius,
                                                       self.normalizeGraph)
-        
+
         self.commGraph = {}
-        
+
         if self.doPrint:
             print("OK", flush = True)
             # Erase the label first, then print it
             print("\tComputing the agent states...", end = ' ', flush = True)
-        
+
         # Compute the states
         stateAll = self.computeStates(posAll, velAll, commGraphAll)
-        
+
         self.state = {}
-        
+
         if self.doPrint:
             # Erase the label
             print("OK", flush = True)
-        
+
         # Separate the states into training, validation and testing samples
         # and save them
         #   Training set
@@ -2617,13 +2699,13 @@ class Flocking(_data):
         self.accel['test'] = accelAll[startSample:endSample]
         self.commGraph['test'] = commGraphAll[startSample:endSample]
         self.state['test'] = stateAll[startSample:endSample]
-        
+
         # Change data to specified type and device
         self.astype(self.dataType)
         self.to(self.device)
-        
+
     def astype(self, dataType):
-        
+
         # Change all other signals to the correct place
         datasetType = ['train', 'valid', 'test']
         for key in datasetType:
@@ -2634,12 +2716,12 @@ class Flocking(_data):
             self.accel[key] = changeDataType(self.accel[key], dataType)
             self.commGraph[key] = changeDataType(self.commGraph[key], dataType)
             self.state[key] = changeDataType(self.state[key], dataType)
-        
+
         # And call the parent
         super().astype(dataType)
-        
+
     def to(self, device):
-        
+
         # Check the data is actually torch
         if 'torch' in repr(self.dataType):
             datasetType = ['train', 'valid', 'test']
@@ -2652,31 +2734,31 @@ class Flocking(_data):
                 self.accel[key].to(device)
                 self.commGraph[key].to(device)
                 self.state[key].to(device)
-            
+
             super().to(device)
-            
+
     def expandDims(self):
         # Just avoid the 'expandDims' method in the parent class
         pass
-        
+
     def computeStates(self, pos, vel, graphMatrix, **kwargs):
-        
+
         # We get the following inputs.
         # positions: nSamples x tSamples x 2 x nAgents
         # velocities: nSamples x tSamples x 2 x nAgents
         # graphMatrix: nSaples x tSamples x nAgents x nAgents
-        
-        # And we want to build the state, which is a vector of dimension 6 on 
+
+        # And we want to build the state, which is a vector of dimension 6 on
         # each node, that is, the output shape is
         #   nSamples x tSamples x 6 x nAgents
-        
+
         # The print for this one can be settled independently, if not, use the
         # default of the data object
         if 'doPrint' in kwargs.keys():
             doPrint = kwargs['doPrint']
         else:
             doPrint = self.doPrint
-        
+
         # Check correct dimensions
         assert len(pos.shape) == len(vel.shape) == len(graphMatrix.shape) == 4
         nSamples = pos.shape[0]
@@ -2688,7 +2770,7 @@ class Flocking(_data):
         assert vel.shape[2] == 2
         assert vel.shape[3] == graphMatrix.shape[2] == graphMatrix.shape[3] \
                 == nAgents
-                
+
         # If we have a lot of batches and a particularly long sequence, this
         # is bound to fail, memory-wise, so let's do it time instant by time
         # instant if we have a large number of time instants, and split the
@@ -2697,7 +2779,7 @@ class Flocking(_data):
             # which to start doing this time by time.
         maxBatchSize = 100 # Maximum number of samples to process at a given
             # time
-        
+
         # Compute the number of samples, and split the indices accordingly
         if nSamples < maxBatchSize:
             nBatches = 1
@@ -2707,7 +2789,7 @@ class Flocking(_data):
             # add one more batch
             nBatches = nSamples // maxBatchSize + 1
             batchSize = [maxBatchSize] * nBatches
-            # But the last batch is actually smaller, so just add the 
+            # But the last batch is actually smaller, so just add the
             # remaining ones
             batchSize[-1] = nSamples - sum(batchSize[0:-1])
         # If they fit evenly, then just do so.
@@ -2718,23 +2800,23 @@ class Flocking(_data):
         # batch. We need to add the 0 because it's the first index.
         batchIndex = np.cumsum(batchSize).tolist()
         batchIndex = [0] + batchIndex
-        
+
         # Create the output state variable
         state = np.zeros((nSamples, tSamples, 6, nAgents))
-        
+
         for b in range(nBatches):
-            
+
             # Pick the batch elements
             posBatch = pos[batchIndex[b]:batchIndex[b+1]]
             velBatch = vel[batchIndex[b]:batchIndex[b+1]]
             graphMatrixBatch = graphMatrix[batchIndex[b]:batchIndex[b+1]]
-        
+
             if tSamples > maxTimeSamples:
-                
+
                 # For each time instant
                 for t in range(tSamples):
-                    
-                    # Now, we need to compute the differences, in velocities and in 
+
+                    # Now, we need to compute the differences, in velocities and in
                     # positions, for each agent, for each time instant
                     posDiff, posDistSq = \
                                      self.computeDifferences(posBatch[:,t,:,:])
@@ -2742,9 +2824,9 @@ class Flocking(_data):
                     #   posDistSq: batchSize[b] x nAgents x nAgents
                     velDiff, _ = self.computeDifferences(velBatch[:,t,:,:])
                     #   velDiff: batchSize[b] x 2 x nAgents x nAgents
-                    
+
                     # Next, we need to get ride of all those places where there are
-                    # no neighborhoods. That is given by the nonzero elements of the 
+                    # no neighborhoods. That is given by the nonzero elements of the
                     # graph matrix.
                     graphMatrixTime = (np.abs(graphMatrixBatch[:,t,:,:])\
                                                                >zeroTolerance)\
@@ -2753,18 +2835,18 @@ class Flocking(_data):
                     # We also need to invert the squares of the distances
                     posDistSqInv = invertTensorEW(posDistSq)
                     #   posDistSqInv: batchSize[b] x nAgents x nAgents
-                    
-                    # Now we add the extra dimensions so that all the 
+
+                    # Now we add the extra dimensions so that all the
                     # multiplications are adequate
                     graphMatrixTime = np.expand_dims(graphMatrixTime, 1)
                     #   graphMatrix: batchSize[b] x 1 x nAgents x nAgents
-                    
+
                     # Then, we can get rid of non-neighbors
                     posDiff = posDiff * graphMatrixTime
                     posDistSqInv = np.expand_dims(posDistSqInv,1)\
                                                               * graphMatrixTime
                     velDiff = velDiff * graphMatrixTime
-                    
+
                     # Finally, we can compute the states
                     stateVel = np.sum(velDiff, axis = 3)
                     #   stateVel: batchSize[b] x 2 x nAgents
@@ -2773,7 +2855,7 @@ class Flocking(_data):
                     #   statePosFourth: batchSize[b] x 2 x nAgents
                     statePosSq = np.sum(posDiff * posDistSqInv, axis = 3)
                     #   statePosSq: batchSize[b] x 2 x nAgents
-                    
+
                     # Concatentate the states and return the result
                     state[batchIndex[b]:batchIndex[b+1],t,:,:] = \
                                                 np.concatenate((stateVel,
@@ -2781,12 +2863,12 @@ class Flocking(_data):
                                                                 statePosSq),
                                                                axis = 1)
                     #   batchSize[b] x 6 x nAgents
-                    
+
                     if doPrint:
                         # Sample percentage count
                         percentageCount = int(100*(t+1+b*tSamples)\
                                                           /(nBatches*tSamples))
-                        
+
                         if t == 0 and b == 0:
                             # It's the first one, so just print it
                             print("%3d%%" % percentageCount,
@@ -2795,19 +2877,19 @@ class Flocking(_data):
                             # Erase the previous characters
                             print('\b \b' * 4 + "%3d%%" % percentageCount,
                                   end = '', flush = True)
-                
+
             else:
-                
-                # Now, we need to compute the differences, in velocities and in 
+
+                # Now, we need to compute the differences, in velocities and in
                 # positions, for each agent, for each time instante
                 posDiff, posDistSq = self.computeDifferences(posBatch)
                 #   posDiff: batchSize[b] x tSamples x 2 x nAgents x nAgents
                 #   posDistSq: batchSize[b] x tSamples x nAgents x nAgents
                 velDiff, _ = self.computeDifferences(velBatch)
                 #   velDiff: batchSize[b] x tSamples x 2 x nAgents x nAgents
-                
+
                 # Next, we need to get ride of all those places where there are
-                # no neighborhoods. That is given by the nonzero elements of the 
+                # no neighborhoods. That is given by the nonzero elements of the
                 # graph matrix.
                 graphMatrixBatch = (np.abs(graphMatrixBatch) > zeroTolerance)\
                                                              .astype(pos.dtype)
@@ -2815,18 +2897,18 @@ class Flocking(_data):
                 # We also need to invert the squares of the distances
                 posDistSqInv = invertTensorEW(posDistSq)
                 #   posDistSqInv: batchSize[b] x tSamples x nAgents x nAgents
-                
+
                 # Now we add the extra dimensions so that all the multiplications
                 # are adequate
                 graphMatrixBatch = np.expand_dims(graphMatrixBatch, 2)
                 #   graphMatrix:batchSize[b] x tSamples x 1 x nAgents x nAgents
-                
+
                 # Then, we can get rid of non-neighbors
                 posDiff = posDiff * graphMatrixBatch
                 posDistSqInv = np.expand_dims(posDistSqInv, 2)\
                                                              * graphMatrixBatch
                 velDiff = velDiff * graphMatrixBatch
-                
+
                 # Finally, we can compute the states
                 stateVel = np.sum(velDiff, axis = 4)
                 #   stateVel: batchSize[b] x tSamples x 2 x nAgents
@@ -2834,7 +2916,7 @@ class Flocking(_data):
                 #   statePosFourth: batchSize[b] x tSamples x 2 x nAgents
                 statePosSq = np.sum(posDiff * posDistSqInv, axis = 4)
                 #   statePosSq: batchSize[b] x tSamples x 2 x nAgents
-                
+
                 # Concatentate the states and return the result
                 state[batchIndex[b]:batchIndex[b+1]] = \
                                                 np.concatenate((stateVel,
@@ -2842,11 +2924,11 @@ class Flocking(_data):
                                                                 statePosSq),
                                                                axis = 2)
                 #   state: batchSize[b] x tSamples x 6 x nAgents
-                                                
+
                 if doPrint:
                     # Sample percentage count
                     percentageCount = int(100*(b+1)/nBatches)
-                    
+
                     if b == 0:
                         # It's the first one, so just print it
                         print("%3d%%" % percentageCount,
@@ -2855,31 +2937,31 @@ class Flocking(_data):
                         # Erase the previous characters
                         print('\b \b' * 4 + "%3d%%" % percentageCount,
                               end = '', flush = True)
-                        
+
         # Print
         if doPrint:
             # Erase the percentage
             print('\b \b' * 4, end = '', flush = True)
-        
+
         return state
-        
+
     def computeCommunicationGraph(self, pos, commRadius, normalizeGraph,
                                   **kwargs):
-        
+
         # Take in the position and the communication radius, and return the
         # trajectory of communication graphs
         # Input will be of shape
         #   nSamples x tSamples x 2 x nAgents
         # Output will be of shape
         #   nSamples x tSamples x nAgents x nAgents
-        
+
         assert commRadius > 0
         assert len(pos.shape) == 4
         nSamples = pos.shape[0]
         tSamples = pos.shape[1]
         assert pos.shape[2] == 2
         nAgents = pos.shape[3]
-        
+
         # Graph type options
         #   Kernel type (only Gaussian implemented so far)
         if 'kernelType' in kwargs.keys():
@@ -2891,21 +2973,21 @@ class Flocking(_data):
             weighted = kwargs['weighted']
         else:
             weighted = False
-        
+
         # If it is a Gaussian kernel, we need to determine the scale
         if kernelType == 'gaussian':
             if 'kernelScale' in kwargs.keys():
                 kernelScale = kwargs['kernelScale']
             else:
                 kernelScale = 1.
-        
+
         # The print for this one can be settled independently, if not, use the
         # default of the data object
         if 'doPrint' in kwargs.keys():
             doPrint = kwargs['doPrint']
         else:
             doPrint = self.doPrint
-                
+
         # If we have a lot of batches and a particularly long sequence, this
         # is bound to fail, memory-wise, so let's do it time instant by time
         # instant if we have a large number of time instants, and split the
@@ -2914,7 +2996,7 @@ class Flocking(_data):
             # which to start doing this time by time.
         maxBatchSize = 100 # Maximum number of samples to process at a given
             # time
-        
+
         # Compute the number of samples, and split the indices accordingly
         if nSamples < maxBatchSize:
             nBatches = 1
@@ -2924,7 +3006,7 @@ class Flocking(_data):
             # add one more batch
             nBatches = nSamples // maxBatchSize + 1
             batchSize = [maxBatchSize] * nBatches
-            # But the last batch is actually smaller, so just add the 
+            # But the last batch is actually smaller, so just add the
             # remaining ones
             batchSize[-1] = nSamples - sum(batchSize[0:-1])
         # If they fit evenly, then just do so.
@@ -2935,22 +3017,22 @@ class Flocking(_data):
         # batch. We need to add the 0 because it's the first index.
         batchIndex = np.cumsum(batchSize).tolist()
         batchIndex = [0] + batchIndex
-        
+
         # Create the output state variable
         graphMatrix = np.zeros((nSamples, tSamples, nAgents, nAgents))
-        
+
         for b in range(nBatches):
-            
+
             # Pick the batch elements
             posBatch = pos[batchIndex[b]:batchIndex[b+1]]
-                
+
             if tSamples > maxTimeSamples:
-                # If the trajectories are longer than 200 points, then do it 
+                # If the trajectories are longer than 200 points, then do it
                 # time by time.
-                
+
                 # For each time instant
                 for t in range(tSamples):
-                    
+
                     # Let's start by computing the distance squared
                     _, distSq = self.computeDifferences(posBatch[:,t,:,:])
                     # Apply the Kernel
@@ -2969,14 +3051,14 @@ class Flocking(_data):
                     if not weighted:
                         graphMatrixTime = (graphMatrixTime > zeroTolerance)\
                                                           .astype(distSq.dtype)
-                                                              
+
                     if normalizeGraph:
                         isSymmetric = np.allclose(graphMatrixTime,
                                                   np.transpose(graphMatrixTime,
                                                                axes = [0,2,1]))
-                        # Tries to make the computation faster, only the 
-                        # eigenvalues (while there is a cost involved in 
-                        # computing whether the matrix is symmetric, 
+                        # Tries to make the computation faster, only the
+                        # eigenvalues (while there is a cost involved in
+                        # computing whether the matrix is symmetric,
                         # experiments found that it is still faster to use the
                         # symmetric algorithm for the eigenvalues)
                         if isSymmetric:
@@ -2989,16 +3071,16 @@ class Flocking(_data):
                         maxEigenvalue=maxEigenvalue.reshape((batchSize[b],1,1))
                         # Normalize
                         graphMatrixTime = graphMatrixTime / maxEigenvalue
-                                                              
+
                     # And put it in the corresponding time instant
                     graphMatrix[batchIndex[b]:batchIndex[b+1],t,:,:] = \
                                                                 graphMatrixTime
-                    
+
                     if doPrint:
                         # Sample percentage count
                         percentageCount = int(100*(t+1+b*tSamples)\
                                                           /(nBatches*tSamples))
-                        
+
                         if t == 0 and b == 0:
                             # It's the first one, so just print it
                             print("%3d%%" % percentageCount,
@@ -3007,7 +3089,7 @@ class Flocking(_data):
                             # Erase the previous characters
                             print('\b \b' * 4 + "%3d%%" % percentageCount,
                                   end = '', flush = True)
-                
+
             else:
                 # Let's start by computing the distance squared
                 _, distSq = self.computeDifferences(posBatch)
@@ -3026,7 +3108,7 @@ class Flocking(_data):
                 if not weighted:
                     graphMatrixBatch = (graphMatrixBatch > zeroTolerance)\
                                                           .astype(distSq.dtype)
-                    
+
                 if normalizeGraph:
                     isSymmetric = np.allclose(graphMatrixBatch,
                                               np.transpose(graphMatrixBatch,
@@ -3044,14 +3126,14 @@ class Flocking(_data):
                                                            1, 1))
                     # Normalize
                     graphMatrixBatch = graphMatrixBatch / maxEigenvalue
-                    
+
                 # Store
                 graphMatrix[batchIndex[b]:batchIndex[b+1]] = graphMatrixBatch
-                
+
                 if doPrint:
                     # Sample percentage count
                     percentageCount = int(100*(b+1)/nBatches)
-                    
+
                     if b == 0:
                         # It's the first one, so just print it
                         print("%3d%%" % percentageCount,
@@ -3060,46 +3142,46 @@ class Flocking(_data):
                         # Erase the previous characters
                         print('\b \b' * 4 + "%3d%%" % percentageCount,
                               end = '', flush = True)
-                    
+
         # Print
         if doPrint:
             # Erase the percentage
             print('\b \b' * 4, end = '', flush = True)
-            
+
         return graphMatrix
-    
+
     def getData(self, name, samplesType, *args):
-        
+
         # samplesType: train, valid, test
         # args: 0 args, give back all
         # args: 1 arg: if int, give that number of samples, chosen at random
         # args: 1 arg: if list, give those samples precisely.
-        
+
         # Check that the type is one of the possible ones
         assert samplesType == 'train' or samplesType == 'valid' \
                     or samplesType == 'test'
         # Check that the number of extra arguments fits
         assert len(args) <= 1
-                    
+
         # Check that the name is actually an attribute
         assert name in dir(self)
-        
+
         # Get the desired attribute
         thisDataDict = getattr(self, name)
-        
+
         # Check it's a dictionary and that it has the corresponding key
         assert type(thisDataDict) is dict
         assert samplesType in thisDataDict.keys()
-        
+
         # Get the data now
         thisData = thisDataDict[samplesType]
         # Get the dimension length
         thisDataDims = len(thisData.shape)
-        
+
         # Check that it has at least two dimension, where the first one is
         # always the number of samples
         assert thisDataDims > 1
-        
+
         if len(args) == 1:
             # If it is an int, just return that number of randomly chosen
             # samples.
@@ -3117,7 +3199,7 @@ class Flocking(_data):
                 # allows for np.array to be used as indices as well. In general,
                 # any variable with the ability to index.
                 thisData = thisData[args[0]]
-                
+
             # If we only selected a single element, then the nDataPoints dim
             # has been left out. So if we have less dimensions, we have to
             # put it back
@@ -3128,16 +3210,16 @@ class Flocking(_data):
                     thisData = np.expand_dims(thisData, axis = 0)
 
         return thisData
-        
+
     def evaluate(self, vel = None, accel = None, initVel = None,
                  samplingTime = None):
-        
+
         # It is optional to add a different sampling time, if not, it uses
         # the internal one
         if samplingTime is None:
             # If there's no argument use the internal sampling time
             samplingTime = self.samplingTime
-        
+
         # Check whether we have vel, or accel and initVel (i.e. we are either
         # given the velocities, or we are given the elements to compute them)
         if vel is not None:
@@ -3155,7 +3237,7 @@ class Flocking(_data):
             assert initVel.shape[0] == nSamples
             assert initVel.shape[1] == 2
             assert initVel.shape[2] == nAgents
-            
+
             # Now that we know we have a accel and init velocity, compute the
             # velocity trajectory
             # Compute the velocity trajectory
@@ -3173,25 +3255,25 @@ class Flocking(_data):
                                dtype=accel.dtype)
                 # Add the initial velocity
                 vel[:,0,:,:] = initVel.copy()
-                
+
             # Go over time
             for t in range(1,tSamples):
                 # Compute velocity
                 vel[:,t,:,:] = accel[:,t-1,:,:] * samplingTime + vel[:,t-1,:,:]
-            
+
         # Check that I did enter one of the if clauses
         assert vel is not None
-            
+
         # And now that we have the velocities, we can compute the cost
         if 'torch' in repr(vel.dtype):
             # Average velocity for time t, averaged across agents
             avgVel = torch.mean(vel, dim = 3) # nSamples x tSamples x 2
             # Compute the difference in velocity between each agent and the
             # mean velocity
-            diffVel = vel - avgVel.unsqueeze(3) 
+            diffVel = vel - avgVel.unsqueeze(3)
             #   nSamples x tSamples x 2 x nAgents
             # Compute the MSE velocity
-            diffVelNorm = torch.sum(diffVel ** 2, dim = 2) 
+            diffVelNorm = torch.sum(diffVel ** 2, dim = 2)
             #   nSamples x tSamples x nAgents
             # Average over agents
             diffVelAvg = torch.mean(diffVelNorm, dim = 2) # nSamples x tSamples
@@ -3210,23 +3292,23 @@ class Flocking(_data):
             diffVelAvg = np.mean(diffVelNorm, axis = 2) # nSamples x tSamples
             costPerSample = np.sum(diffVelAvg, axis = 1) # nSamples
             cost = np.mean(costPerSample) # scalar
-        
+
         return cost
-    
+
     def computeTrajectory(self, initPos, initVel, duration, **kwargs):
-        
+
         # Check initPos is of shape batchSize x 2 x nAgents
         assert len(initPos.shape) == 3
         batchSize = initPos.shape[0]
         assert initPos.shape[1]
         nAgents = initPos.shape[2]
-        
+
         # Check initVel is of shape batchSize x 2 x nAgents
         assert len(initVel.shape) == 3
         assert initVel.shape[0] == batchSize
         assert initVel.shape[1] == 2
         assert initVel.shape[2] == nAgents
-        
+
         # Check what kind of data it is
         #   This is because all the functions are numpy, but if this was
         #   torch, we need to return torch, to make it consistent
@@ -3237,18 +3319,18 @@ class Flocking(_data):
             assert initVel.device == device
         else:
             useTorch = False
-        
+
         # Create time line
         time = np.arange(0, duration, self.samplingTime)
         tSamples = len(time)
-        
+
         # Here, we have two options, or we're given the acceleration or the
         # architecture
         assert 'archit' in kwargs.keys() or 'accel' in kwargs.keys()
         # Flags to determine which method to use
         useArchit = False
         useAccel = False
-        
+
         if 'archit' in kwargs.keys():
             archit = kwargs['archit'] # This is a torch.nn.Module architecture
             architDevice = list(archit.parameters())[0].device
@@ -3264,13 +3346,13 @@ class Flocking(_data):
             if useTorch:
                 assert 'torch' in repr(accel.dtype)
             useAccel = True
-            
+
         # Decide on printing or not:
         if 'doPrint' in kwargs.keys():
             doPrint = kwargs['doPrint']
         else:
             doPrint = self.doPrint # Use default
-        
+
         # Now create the outputs that will be filled afterwards
         pos = np.zeros((batchSize, tSamples, 2, nAgents), dtype = np.float)
         vel = np.zeros((batchSize, tSamples, 2, nAgents), dtype = np.float)
@@ -3279,7 +3361,7 @@ class Flocking(_data):
             state = np.zeros((batchSize, tSamples, 6, nAgents), dtype=np.float)
             graph = np.zeros((batchSize, tSamples, nAgents, nAgents),
                              dtype = np.float)
-            
+
         # Assign the initial positions and velocities
         if useTorch:
             pos[:,0,:,:] = initPos.cpu().numpy()
@@ -3289,16 +3371,16 @@ class Flocking(_data):
         else:
             pos[:,0,:,:] = initPos.copy()
             vel[:,0,:,:] = initVel.copy()
-            
+
         if doPrint:
             # Sample percentage count
             percentageCount = int(100/tSamples)
             # Print new value
             print("%3d%%" % percentageCount, end = '', flush = True)
-            
+
         # Now, let's get started:
         for t in range(1, tSamples):
-            
+
             # If it is architecture-based, we need to compute the state, and
             # for that, we need to compute the graph
             if useArchit:
@@ -3318,7 +3400,7 @@ class Flocking(_data):
                                                doPrint = False)
                 # Save state
                 state[:,t-1,:,:] = thisState.squeeze(1)
-                
+
                 # Compute the output of the architecture
                 #   Note that we need the collection of all time instants up
                 #   to now, because when we do the communication exchanges,
@@ -3327,27 +3409,27 @@ class Flocking(_data):
                 S = torch.tensor(graph[:,0:t,:,:], device = architDevice)
                 with torch.no_grad():
                     thisAccel = archit(x, S)
-                # Now that we have computed the acceleration, we only care 
+                # Now that we have computed the acceleration, we only care
                 # about the last element in time
                 thisAccel = thisAccel.cpu().numpy()[:,-1,:,:]
                 thisAccel[thisAccel > self.accelMax] = self.accelMax
                 thisAccel[thisAccel < -self.accelMax] = self.accelMax
                 # And save it
                 accel[:,t-1,:,:] = thisAccel
-                
+
             # Now that we have the acceleration, we can update position and
             # velocity
             vel[:,t,:,:] = accel[:,t-1,:,:] * self.samplingTime +vel[:,t-1,:,:]
             pos[:,t,:,:] = accel[:,t-1,:,:] * (self.samplingTime ** 2)/2 + \
                             vel[:,t-1,:,:] * self.samplingTime + pos[:,t-1,:,:]
-            
+
             if doPrint:
                 # Sample percentage count
                 percentageCount = int(100*(t+1)/tSamples)
                 # Erase previous value and print new value
                 print('\b \b' * 4 + "%3d%%" % percentageCount,
                       end = '', flush = True)
-                
+
         # And we're missing the last values of graph, state and accel, so
         # let's compute them for completeness
         #   Graph
@@ -3370,26 +3452,26 @@ class Flocking(_data):
         thisAccel[thisAccel < -self.accelMax] = self.accelMax
         # And save it
         accel[:,-1,:,:] = thisAccel
-                
+
         # Print
         if doPrint:
             # Erase the percentage
             print('\b \b' * 4, end = '', flush = True)
-            
+
         # After we have finished, turn it back into tensor, if required
         if useTorch:
             pos = torch.tensor(pos).to(device)
             vel = torch.tensor(vel).to(device)
             accel = torch.tensor(accel).to(device)
-            
+
         # And return it
         if useArchit:
             return pos, vel, accel, state, graph
         elif useAccel:
             return pos, vel
-    
+
     def computeDifferences(self, u):
-        
+
         # Takes as input a tensor of shape
         #   nSamples x tSamples x 2 x nAgents
         # or of shape
@@ -3398,7 +3480,7 @@ class Flocking(_data):
         #   nSamples (x tSamples) x 2 x nAgents x nAgents
         # And the distance squared ||u_i - u_j||^2 of shape
         #   nSamples (x tSamples) x nAgents x nAgents
-        
+
         # Check dimensions
         assert len(u.shape) == 3 or len(u.shape) == 4
         # If it has shape 3, which means it's only a single time instant, then
@@ -3409,14 +3491,14 @@ class Flocking(_data):
             hasTimeDim = False
         else:
             hasTimeDim = True
-        
+
         # Now we have that pos always has shape
         #   nSamples x tSamples x 2 x nAgents
         nSamples = u.shape[0]
         tSamples = u.shape[1]
         assert u.shape[2] == 2
         nAgents = u.shape[3]
-        
+
         # Compute the difference along each axis. For this, we subtract a
         # column vector from a row vector. The difference tensor on each
         # position will have shape nSamples x tSamples x nAgents x nAgents
@@ -3442,7 +3524,7 @@ class Flocking(_data):
         #   And concatenate them
         uDiff = np.concatenate((uDiff_x, uDiff_y), 2)
         #   nSamples x tSamples x 2 x nAgents x nAgents
-            
+
         # Get rid of the time dimension if we don't need it
         if not hasTimeDim:
             # (This fails if tSamples > 1)
@@ -3450,13 +3532,13 @@ class Flocking(_data):
             #   nSamples x nAgents x nAgents
             uDiff = uDiff.squeeze(1)
             #   nSamples x 2 x nAgents x nAgents
-            
+
         return uDiff, uDistSq
-        
-    def computeOptimalTrajectory(self, initPos, initVel, duration, 
+
+    def computeOptimalTrajectory(self, initPos, initVel, duration,
                                  samplingTime, repelDist,
                                  accelMax = 100.):
-        
+
         # The optimal trajectory is given by
         # u_{i} = - \sum_{j=1}^{N} (v_{i} - v_{j})
         #         + 2 \sum_{j=1}^{N} (r_{i} - r_{j}) *
@@ -3464,7 +3546,7 @@ class Flocking(_data):
         #                                 1{\|r_{ij}\| < R}
         # for each agent i=1,...,N, where v_{i} is the velocity and r_{i} the
         # position.
-        
+
         # Check that initPos and initVel as nSamples x 2 x nAgents arrays
         assert len(initPos.shape) == len(initVel.shape) == 3
         nSamples = initPos.shape[0]
@@ -3472,29 +3554,29 @@ class Flocking(_data):
         nAgents = initPos.shape[2]
         assert initVel.shape[0] == nSamples
         assert initVel.shape[2] == nAgents
-        
+
         # time
         time = np.arange(0, duration, samplingTime)
         tSamples = len(time) # number of time samples
-        
+
         # Create arrays to store the trajectory
         pos = np.zeros((nSamples, tSamples, 2, nAgents))
         vel = np.zeros((nSamples, tSamples, 2, nAgents))
         accel = np.zeros((nSamples, tSamples, 2, nAgents))
-        
+
         # Initial settings
         pos[:,0,:,:] = initPos
         vel[:,0,:,:] = initVel
-        
+
         if self.doPrint:
             # Sample percentage count
             percentageCount = int(100/tSamples)
             # Print new value
             print("%3d%%" % percentageCount, end = '', flush = True)
-        
+
         # For each time instant
         for t in range(1,tSamples):
-            
+
             # Compute the optimal acceleration
             #   Compute the distance between all elements (positions)
             ijDiffPos, ijDistSq = self.computeDifferences(pos[:,t-1,:,:])
@@ -3504,7 +3586,7 @@ class Flocking(_data):
             ijDiffVel, _ = self.computeDifferences(vel[:,t-1,:,:])
             #       ijDiffVel: nSamples x 2 x nAgents x nAgents
             #   The last element we need to compute the acceleration is the
-            #   gradient. Note that the gradient only counts when the distance 
+            #   gradient. Note that the gradient only counts when the distance
             #   is smaller than the repel distance
             #       This is the mask to consider each of the differences
             repelMask = (ijDistSq < (repelDist**2)).astype(ijDiffPos.dtype)
@@ -3519,7 +3601,7 @@ class Flocking(_data):
                     -np.sum(ijDiffVel, axis = 3) \
                     +2* np.sum(ijDiffPos * (ijDistSqInv ** 2 + ijDistSqInv),
                                axis = 3)
-                    
+
             # Finally, note that if the agents are too close together, the
             # acceleration will be very big to get them as far apart as
             # possible, and this is physically impossible.
@@ -3533,32 +3615,32 @@ class Flocking(_data):
             thisAccel[accel[:,t-1,:,:] < -accelMax] = -accelMax
             # And put it back
             accel[:,t-1,:,:] = thisAccel
-            
+
             # Update the values
             #   Update velocity
             vel[:,t,:,:] = accel[:,t-1,:,:] * samplingTime + vel[:,t-1,:,:]
             #   Update the position
             pos[:,t,:,:] = accel[:,t-1,:,:] * (samplingTime ** 2)/2 + \
                                  vel[:,t-1,:,:] * samplingTime + pos[:,t-1,:,:]
-            
+
             if self.doPrint:
                 # Sample percentage count
                 percentageCount = int(100*(t+1)/tSamples)
                 # Erase previous pecentage and print new value
                 print('\b \b' * 4 + "%3d%%" % percentageCount,
                       end = '', flush = True)
-                
+
         # Print
         if self.doPrint:
             # Erase the percentage
             print('\b \b' * 4, end = '', flush = True)
-            
+
         return pos, vel, accel
-        
+
     def computeInitialPositions(self, nAgents, nSamples, commRadius,
                                 minDist = 0.1, geometry = 'rectangular',
                                 **kwargs):
-        
+
         # It will always be uniform. We can select whether it is rectangular
         # or circular (or some other shape) and the parameters respecting
         # that
@@ -3567,16 +3649,16 @@ class Flocking(_data):
         # We use a zeroTolerance buffer zone, just in case
         minDist = minDist * (1. + zeroTolerance)
         commRadius = commRadius * (1. - zeroTolerance)
-        
+
         # If there are other keys in the kwargs argument, they will just be
         # ignored
-        
+
         # We will first create the grid, whether it is rectangular or
         # circular.
-        
+
         # Let's start by setting the fixed position
         if geometry == 'rectangular':
-            
+
             # This grid has a distance that depends on the desired minDist and
             # the commRadius
             distFixed = (commRadius + minDist)/(2.*np.sqrt(2))
@@ -3587,46 +3669,46 @@ class Flocking(_data):
             # This should guarantee that, even after the perturbations, there
             # are no agents below minDist, and that all agents have at least
             # one other agent within commRadius.
-            
+
             # How many agents per axis
             nAgentsPerAxis = int(np.ceil(np.sqrt(nAgents)))
-            
+
             axisFixedPos = np.arange(-(nAgentsPerAxis * distFixed)/2,
                                        (nAgentsPerAxis * distFixed)/2,
                                       step = distFixed)
-            
+
             # Repeat the positions in the same order (x coordinate)
             xFixedPos = np.tile(axisFixedPos, nAgentsPerAxis)
             # Repeat each element (y coordinate)
             yFixedPos = np.repeat(axisFixedPos, nAgentsPerAxis)
-            
+
             # Concatenate this to obtain the positions
             fixedPos = np.concatenate((np.expand_dims(xFixedPos, 0),
                                        np.expand_dims(yFixedPos, 0)),
                                       axis = 0)
-            
+
             # Get rid of unnecessary agents
             fixedPos = fixedPos[:, 0:nAgents]
             # And repeat for the number of samples we want to generate
             fixedPos = np.repeat(np.expand_dims(fixedPos, 0), nSamples,
                                  axis = 0)
             #   nSamples x 2 x nAgents
-            
+
             # Now generate the noise
             perturbPos = np.random.uniform(low = -distPerturb,
                                            high = distPerturb,
                                            size = (nSamples, 2, nAgents))
-            
+
             # Initial positions
             initPos = fixedPos + perturbPos
-                
+
         elif geometry == 'circular':
-            
+
             # Radius for the grid
             rFixed = (commRadius + minDist)/2.
             rPerturb = (commRadius - minDist)/4.
             fixedRadius = np.arange(0, rFixed * nAgents, step = rFixed)+rFixed
-            
+
             # Angles for the grid
             aFixed = (commRadius/fixedRadius + minDist/fixedRadius)/2.
             for a in range(len(aFixed)):
@@ -3635,7 +3717,7 @@ class Flocking(_data):
                 # And now divide 2*np.pi by this number
                 aFixed[a] = 2 * np.pi / nAgentsPerCircle
             #   Fixed angle difference for each value of fixedRadius
-            
+
             # Now, let's get the radius, angle coordinates for each agents
             initRadius = np.empty((0))
             initAngles = np.empty((0))
@@ -3651,17 +3733,17 @@ class Flocking(_data):
                 initAngles = np.concatenate((initAngles, thisAngles))
                 n += 1
                 assert len(initRadius) == agentsSoFar
-                
+
             # Restrict to the number of agents we need
             initRadius = initRadius[0:nAgents]
             initAngles = initAngles[0:nAgents]
-            
+
             # Add the number of samples
             initRadius = np.repeat(np.expand_dims(initRadius, 0), nSamples,
                                    axis = 0)
             initAngles = np.repeat(np.expand_dims(initAngles, 0), nSamples,
                                    axis = 0)
-            
+
             # Add the noise
             #   First, to the angles
             for n in range(nAgents):
@@ -3677,16 +3759,16 @@ class Flocking(_data):
             initRadius += np.random.uniform(low = -rPerturb,
                                             high = rPerturb,
                                             size = (nSamples, nAgents))
-            
+
             # And finally, get the positions in the cartesian coordinates
             initPos = np.zeros((nSamples, 2, nAgents))
             initPos[:, 0, :] = initRadius * np.cos(initAngles)
             initPos[:, 1, :] = initRadius * np.sin(initAngles)
-            
+
         # Now, check that the conditions are met:
         #   Compute square distances
         _, distSq = self.computeDifferences(np.expand_dims(initPos, 1))
-        #   Get rid of the "time" dimension that arises from using the 
+        #   Get rid of the "time" dimension that arises from using the
         #   method to compute distances
         distSq = distSq.squeeze(1)
         #   Compute the minimum distance (don't forget to add something in
@@ -3697,24 +3779,24 @@ class Flocking(_data):
                                                               distSq.shape[1],
                                                               distSq.shape[2])
                            )
-        
+
         assert minDistSq >= minDist ** 2
-        
+
         #   Now the number of neighbors
         graphMatrix = self.computeCommunicationGraph(np.expand_dims(initPos,1),
                                                      self.commRadius,
                                                      False,
                                                      doPrint = False)
-        graphMatrix = graphMatrix.squeeze(1) # nSamples x nAgents x nAgents  
-        
+        graphMatrix = graphMatrix.squeeze(1) # nSamples x nAgents x nAgents
+
         #   Binarize the matrix
         graphMatrix = (np.abs(graphMatrix) > zeroTolerance)\
                                                          .astype(initPos.dtype)
-        
+
         #   And check that we always have initially connected graphs
         for n in range(nSamples):
             assert graph.isConnected(graphMatrix[n,:,:])
-        
+
         # We move to compute the initial velocities. Velocities can be
         # either positive or negative, so we do not need to determine
         # the lower and higher, just around zero
@@ -3728,7 +3810,7 @@ class Flocking(_data):
             yMaxInitVel = kwargs['yMaxInitVel']
         else:
             yMaxInitVel = 3.
-        
+
         # And sample the velocities
         xInitVel = np.random.uniform(low = -xMaxInitVel, high = xMaxInitVel,
                                      size = (nSamples, 1, nAgents))
@@ -3739,18 +3821,18 @@ class Flocking(_data):
                                      size = (nSamples))
         yVelBias = np.random.uniform(low = -yMaxInitVel, high = yMaxInitVel,
                                      size = (nSamples))
-        
+
         # And concatenate them
         velBias = np.concatenate((xVelBias, yVelBias)).reshape((nSamples,2,1))
         initVel = np.concatenate((xInitVel, yInitVel), axis = 1) + velBias
         #   nSamples x 2 x nAgents
-        
+
         return initPos, initVel
-        
-        
-    def saveVideo(self, saveDir, pos, *args, 
+
+
+    def saveVideo(self, saveDir, pos, *args,
                   commGraph = None, **kwargs):
-        
+
         # Check that pos is a position of shape nSamples x tSamples x 2 x nAgents
         assert len(pos.shape) == 4
         nSamples = pos.shape[0]
@@ -3759,7 +3841,7 @@ class Flocking(_data):
         nAgents = pos.shape[3]
         if 'torch' in repr(pos.dtype):
             pos = pos.cpu().numpy()
-        
+
         # Check if there's the need to plot a graph
         if commGraph is not None:
             # If there's a communication graph, then it has to have shape
@@ -3773,26 +3855,26 @@ class Flocking(_data):
             showGraph = True
         else:
             showGraph = False
-        
+
         if 'doPrint' in kwargs.keys():
             doPrint = kwargs['doPrint']
         else:
             doPrint = self.doPrint
-            
+
         # This number determines how faster or slower to reproduce the video
         if 'videoSpeed' in kwargs.keys():
             videoSpeed = kwargs['videoSpeed']
         else:
             videoSpeed = 1.
-            
+
         if 'showVideoSpeed' in kwargs.keys():
             showVideoSpeed = kwargs['showVideoSpeed']
         else:
             if videoSpeed != 1:
                 showVideoSpeed = True
             else:
-                showVideoSpeed = False    
-                
+                showVideoSpeed = False
+
         if 'vel' in kwargs.keys():
             vel = kwargs['vel']
             if 'showCost' in kwargs.keys():
@@ -3806,7 +3888,7 @@ class Flocking(_data):
         else:
             showCost = False
             showArrows = False
-        
+
         # Check that the number of extra arguments fits
         assert len(args) <= 1
         # If there's an argument, we have to check whether it is an int or a
@@ -3825,108 +3907,108 @@ class Flocking(_data):
                 # allows for np.array to be used as indices as well. In general,
                 # any variable with the ability to index.
                 selectedIndices = args[0]
-                
+
             # Select the corresponding samples
             pos = pos[selectedIndices]
-                
-            # Finally, observe that if pos has shape only 3, then that's 
+
+            # Finally, observe that if pos has shape only 3, then that's
             # because we selected a single sample, so we need to add the extra
             # dimension back again
             if len(pos.shape) < 4:
                 pos = np.expand_dims(pos, 0)
-                
+
             if showGraph:
                 commGraph = commGraph[selectedIndices]
                 if len(commGraph.shape)< 4:
                     commGraph = np.expand_dims(commGraph, 0)
-        
+
         # Where to save the video
         if not os.path.exists(saveDir):
             os.mkdir(saveDir)
-            
+
         videoName = 'sampleTrajectory'
-        
+
         xMinMap = np.min(pos[:,:,0,:]) * 1.2
         xMaxMap = np.max(pos[:,:,0,:]) * 1.2
         yMinMap = np.min(pos[:,:,1,:]) * 1.2
         yMaxMap = np.max(pos[:,:,1,:]) * 1.2
-        
+
         # Create video object
-        
+
         videoMetadata = dict(title = 'Sample Trajectory', artist = 'Flocking',
                              comment='Flocking example')
         videoWriter = FFMpegWriter(fps = videoSpeed/self.samplingTime,
                                    metadata = videoMetadata)
-        
+
         if doPrint:
             print("\tSaving video(s)...", end = ' ', flush = True)
-        
+
         # For each sample now
         for n in range(pos.shape[0]):
-            
+
             # If there's more than one video to create, enumerate them
             if pos.shape[0] > 1:
                 thisVideoName = videoName + '%03d.mp4' % n
             else:
                 thisVideoName = videoName + '.mp4'
-            
+
             # Select the corresponding position trajectory
             thisPos = pos[n]
-            
+
             # Create figure
             videoFig = plt.figure(figsize = (5,5))
-            
+
             # Set limits
             plt.xlim((xMinMap, xMaxMap))
             plt.ylim((yMinMap, yMaxMap))
             plt.axis('equal')
-            
+
             if showVideoSpeed:
                 plt.text(xMinMap, yMinMap, r'Speed: $%.2f$' % videoSpeed)
-                
+
             # Create plot handle
-            plotAgents, = plt.plot([], [], 
+            plotAgents, = plt.plot([], [],
                                    marker = 'o',
                                    markersize = 3,
                                    linewidth = 0,
                                    color = '#01256E',
                                    scalex = False,
                                    scaley = False)
-            
+
             # Create the video
             with videoWriter.saving(videoFig,
                                     os.path.join(saveDir,thisVideoName),
                                     tSamples):
-                
+
                 for t in range(tSamples):
-                        
+
                     # Plot the agents
                     plotAgents.set_data(thisPos[t,0,:], thisPos[t,1,:])
                     videoWriter.grab_frame()
-                    
+
                     # Print
                     if doPrint:
                         # Sample percentage count
                         percentageCount = int(
                                  100*(t+1+n*tSamples)/(tSamples * pos.shape[0])
                                               )
-                        
+
                         if n == 0 and t == 0:
                             print("%3d%%" % percentageCount,
                                   end = '', flush = True)
                         else:
                             print('\b \b' * 4 + "%3d%%" % percentageCount,
                                   end = '', flush = True)
-        
+
             plt.close(fig=videoFig)
-            
+
         # Print
         if doPrint:
             # Erase the percentage and the label
             print('\b \b' * 4 + "OK", flush = True)
-            
+
         if showGraph:
-            
+
             # Normalize velocity
             if showArrows:
                 # vel is of shape nSamples x tSamples x 2 x nAgents
@@ -3937,46 +4019,46 @@ class Flocking(_data):
                 maxVelNormSq = maxVelNormSq.reshape((nSamples, 1, 1, 1))
                 #   nSamples x 1 x 1 x 1
                 normVel = 2*vel/np.sqrt(maxVelNormSq)
-            
+
             if doPrint:
                 print("\tSaving graph snapshots...", end = ' ', flush = True)
-            
+
             # Essentially, we will print nGraphs snapshots and save them
             # as images with the graph. This is the best we can do in a
             # reasonable processing time (adding the graph to the video takes
             # forever).
             time = np.arange(0, self.duration, step = self.samplingTime)
             assert len(time) == tSamples
-            
+
             nSnapshots = 5 # The number of snapshots we will consider
             tSnapshots = np.linspace(0, tSamples-1, num = nSnapshots)
             #   This gives us nSnapshots equally spaced in time. Now, we need
             #   to be sure these are integers
             tSnapshots = np.unique(tSnapshots.astype(np.int)).astype(np.int)
-            
+
             # Directory to save the snapshots
             snapshotDir = os.path.join(saveDir,'graphSnapshots')
             # Base name of the snapshots
             snapshotName = 'graphSnapshot'
-            
+
             for n in range(pos.shape[0]):
-                
+
                 if pos.shape[0] > 1:
                     thisSnapshotDir = snapshotDir + '%03d' % n
                     thisSnapshotName = snapshotName + '%03d' % n
                 else:
                     thisSnapshotDir = snapshotDir
                     thisSnapshotName = snapshotName
-                    
+
                 if not os.path.exists(thisSnapshotDir):
                     os.mkdir(thisSnapshotDir)
-                
+
                 # Get the corresponding positions
                 thisPos = pos[n]
                 thisCommGraph = commGraph[n]
-                
+
                 for t in tSnapshots:
-                    
+
                     # Get the edge pairs
                     #   Get the graph for this time instant
                     thisCommGraphTime = thisCommGraph[t]
@@ -3986,51 +4068,51 @@ class Flocking(_data):
                     if isSymmetric:
                         #   Use only half of the matrix
                         thisCommGraphTime = np.triu(thisCommGraphTime)
-                    
+
                     #   Find the position of all edges
                     outEdge, inEdge = np.nonzero(np.abs(thisCommGraphTime) \
                                                                > zeroTolerance)
-                    
+
                     # Create the figure
                     thisGraphSnapshotFig = plt.figure(figsize = (5,5))
-                    
+
                     # Set limits (to be the same as the video)
                     plt.xlim((xMinMap, xMaxMap))
                     plt.ylim((yMinMap, yMaxMap))
                     plt.axis('equal')
-                    
+
                     # Plot the edges
                     plt.plot([thisPos[t,0,outEdge], thisPos[t,0,inEdge]],
                              [thisPos[t,1,outEdge], thisPos[t,1,inEdge]],
                              color = '#A8AAAF', linewidth = 0.75,
                              scalex = False, scaley = False)
-                    
+
                     # Plot the arrows
                     if showArrows:
                         for i in range(nAgents):
                             plt.arrow(thisPos[t,0,i], thisPos[t,1,i],
                                       normVel[n,t,0,i], normVel[n,t,1,i])
-                
+
                     # Plot the nodes
                     plt.plot(thisPos[t,0,:], thisPos[t,1,:],
                              marker = 'o', markersize = 3, linewidth = 0,
                              color = '#01256E', scalex = False, scaley = False)
-                    
+
                     # Add the cost value
                     if showCost:
                         totalCost = self.evaluate(vel = vel[:,t:t+1,:,:])
                         plt.text(xMinMap,yMinMap, r'Cost: $%.4f$' % totalCost)
-                    
+
                     # Add title
                     plt.title("Time $t=%.4f$s" % time[t])
-                    
+
                     # Save figure
                     thisGraphSnapshotFig.savefig(os.path.join(thisSnapshotDir,
                                             thisSnapshotName + '%03d.pdf' % t))
-                    
+
                     # Close figure
                     plt.close(fig = thisGraphSnapshotFig)
-                    
+
                     # Print percentage completion
                     if doPrint:
                         # Sample percentage count
@@ -4045,14 +4127,14 @@ class Flocking(_data):
                             # Erase the previous characters
                             print('\b \b' * 4 + "%3d%%" % percentageCount,
                                   end = '', flush = True)
-                        
-                        
-                
+
+
+
             # Print
             if doPrint:
                 # Erase the percentage and the label
                 print('\b \b' * 4 + "OK", flush = True)
-            
+
 class TwentyNews(_dataForClassification):
     """
     TwentyNews: Loads and handles handles the 20NEWS dataset
@@ -4076,32 +4158,32 @@ class TwentyNews(_dataForClassification):
         device (device): where to store the data (e.g., 'cpu', 'cuda:0', etc.)
 
     Methods:
-        
-    .getData(dataSubset): loads the data belonging to dataSubset (i.e. 'train' 
+
+    .getData(dataSubset): loads the data belonging to dataSubset (i.e. 'train'
         or 'test')
-    
+
     .embedData(): compute the graph embedding of the training dataset after
         it has been loaded
-    
+
     .normalizeData(normType): normalize the data in the embedded space following
         a normType norm.
-    
+
     .createValidationSet(ratio): stores ratio% of the training set as validation
         set.
-        
+
     .createGraph(): uses the word2vec embedding of the training set to compute
         a geometric graph
-        
+
     .getGraph(): fetches the adjacency matrix of the stored graph
-    
+
     .getNumberOfClasses(): fetches the number of classes
-    
+
     .reduceDataset(nTrain, nValid, nTest): reduces the dataset by randomly
         selected nTrain, nValid and nTest samples from the training, validation
         and testing datasets, respectively.
-        
+
     authorData = .getAuthorData(samplesType, selectData, [, optionalArguments])
-    
+
         Input:
             samplesType (string): 'train', 'valid', 'test' or 'all' to determine
                 from which dataset to get the raw author data from
@@ -4112,21 +4194,21 @@ class TwentyNews(_dataForClassification):
                 0 optional arguments: get all the samples from the specified set
                 1 optional argument (int): number of samples to get (at random)
                 1 optional argument (list): specific indices of samples to get
-        
+
         Output:
             Either the WANs or the word frequency count of all the excerpts of
             the selected author
-            
+
     .createGraph(): creates a graph from the WANs of the excerpt written by the
         selected author available in the training set. The fusion of this WANs
-        is done in accordance with the input options following 
+        is done in accordance with the input options following
         graphTools.createGraph().
         The resulting adjacency matrix is stored.
-        
+
     .getGraph(): fetches the stored adjacency matrix and returns it
-    
+
     .getFunctionWords(): fetches the list of functional words. Returns a tuple
-        where the first element correspond to all the functional words in use, 
+        where the first element correspond to all the functional words in use,
         and the second element consists of all the functional words available.
         Obs.: When we created the graph, some of the functional words might have
         been dropped in order to make it connected, for example.
@@ -4167,14 +4249,14 @@ class TwentyNews(_dataForClassification):
     """
     def __init__(self, ratioValid, nWords, nWordsShortDocs, nEdges, distMetric,
                  dataDir, dataType = np.float64, device = 'cpu'):
-        
+
         super().__init__()
         # This creates the attributes: dataType, device, nTrain, nTest, nValid,
-        # and samples, and fills them all with None, and also creates the 
+        # and samples, and fills them all with None, and also creates the
         # methods: getSamples, astype, to, and evaluate.
         self.dataType = dataType
         self.device = device
-        
+
         # Other relevant information we need to store:
         self.dataDir = dataDir # Where the data is
         self.N = nWords # Number of nodes
@@ -4190,7 +4272,7 @@ class TwentyNews(_dataForClassification):
             # to build the graph
         self.adjacencyMatrix = None # Store the graph built from the loaded
             # data
-    
+
         # Get the training dataset. Saves vocab, dataset, and samples
         self.getData('train')
         # Embeds the data following the N words and a word2vec approach, saves
@@ -4211,9 +4293,9 @@ class TwentyNews(_dataForClassification):
         # Change data to specified type and device
         self.astype(self.dataType)
         self.to(self.device)
-        
+
     def getData(self, dataSubset):
-        
+
         # Load dataset
         dataset = Text20News(data_home = self.dataDir,
                              subset = dataSubset,
@@ -4228,7 +4310,7 @@ class TwentyNews(_dataForClassification):
             self.vocab = dataset.vocab
         else:
             dataset.vectorize(vocabulary = self.vocab)
-    
+
         # Get rid of short documents
         if dataSubset == 'train':
             dataset.remove_short_documents(nwords = self.nWordsShortDocs,
@@ -4239,14 +4321,14 @@ class TwentyNews(_dataForClassification):
         else:
             dataset.remove_short_documents(nwords = self.nWordsShortDocs,
                                            vocab = 'selected')
-        
+
         # Save them in the corresponding places
         self.samples[dataSubset]['signals'] = dataset.data.toarray()
         self.samples[dataSubset]['targets'] = dataset.labels
         self.dataset[dataSubset] = dataset
-        
+
     def embedData(self):
-        
+
         # We need to have loaded the training dataset first.
         assert 'train' in self.dataset.keys()
         # Embed them (word2vec embedding)
@@ -4255,7 +4337,7 @@ class TwentyNews(_dataForClassification):
         self.dataset['train'].keep_top_words(self.N)
         # Update the vocabulary
         self.vocab = self.dataset['train'].vocab
-        # Get rid of short documents when considering only the specific 
+        # Get rid of short documents when considering only the specific
         # vocabulary
         self.dataset['train'].remove_short_documents(
                                                   nwords = self.nWordsShortDocs,
@@ -4271,16 +4353,16 @@ class TwentyNews(_dataForClassification):
             # Update the samples
             self.samples['test']['signals'] =self.dataset['test'].data.toarray()
             self.samples['test']['targets'] = self.dataset['test'].labels
-        
+
     def normalizeData(self, normType = 'l1'):
-        
+
         for key in self.dataset.keys():
             # Normalize the frequencies on the l1 norm.
             self.dataset[key].normalize(norm = normType)
             # And save it
             self.samples[key]['signals'] = self.dataset[key].data.toarray()
             self.samples[key]['targets'] = self.dataset[key].labels
-            
+
     def createValidationSet(self, ratio):
         # How many valid samples
         self.nValid = int(ratio * self.nTrain)
@@ -4301,9 +4383,9 @@ class TwentyNews(_dataForClassification):
         # Update the numbers
         self.nValid = self.samples['valid']['targets'].shape[0]
         self.nTrain = self.samples['train']['targets'].shape[0]
-            
+
     def createGraph(self, *args):
-        
+
         assert self.graphData is not None
         assert len(args) == 0 or len(args) == 2
         if len(args) == 2:
@@ -4312,15 +4394,15 @@ class TwentyNews(_dataForClassification):
         dist, idx = distance_sklearn_metrics(self.graphData, k = self.M,
                                              metric = self.distMetric)
         self.adjacencyMatrix = adjacency(dist, idx).toarray()
-        
+
     def getGraph(self):
-        
+
         return self.adjacencyMatrix
-    
+
     def getNumberOfClasses(self):
-        
+
         return self.nClasses
-    
+
     def reduceDataset(self, nTrain, nValid, nTest):
         if nTrain < self.nTrain:
             randomIndices = np.random.permutation(self.nTrain)
@@ -4355,7 +4437,7 @@ class TwentyNews(_dataForClassification):
                                                           ['targets']\
                                                           [testIndices]
             self.nTest = nTest
-    
+
     def astype(self, dataType):
         # This changes the type for the graph data, as well as the adjacency
         # matrix. We are going to leave the dataset attribute as it is, since
@@ -4363,11 +4445,11 @@ class TwentyNews(_dataForClassification):
         self.graphData = changeDataType(self.graphData, dataType)
         self.adjacencyMatrix = changeDataType(self.adjacencyMatrix, dataType)
 
-        # And now, initialize to change the samples as well (and also save the 
+        # And now, initialize to change the samples as well (and also save the
         # data type)
         super().astype(dataType)
-        
-    
+
+
     def to(self, device):
         # If the dataType is 'torch'
         if repr(self.dataType).find('torch') >= 0:
@@ -4378,7 +4460,7 @@ class TwentyNews(_dataForClassification):
             # And call the inherit method to initialize samples (and save to
             # device)
             super().to(device)
-    
+
 # Copied almost verbatim from the code by Michäel Defferrard, available at
 # http://github.com/mdeff/cnn_graph
 
@@ -4455,7 +4537,7 @@ def replace_random_edges(A, noise_level):
 	A = A.tocsr()
 	A.eliminate_zeros()
 	return A
-        
+
 class TextDataset(object):
     def clean_text(self, num='substitute'):
         # TODO: stemming, lemmatisation
@@ -4488,7 +4570,7 @@ class TextDataset(object):
             doc = doc.replace('$', ' dollar ')
             doc = doc.lower()
             doc = re.sub('[^a-z]', ' ', doc)
-            doc = ' '.join(doc.split()) # same as 
+            doc = ' '.join(doc.split()) # same as
                                         # doc = re.sub('\s{2,}', ' ', doc)
             self.documents[i] = doc
 
@@ -4566,7 +4648,7 @@ class TextDataset(object):
             except KeyError:
                 not_found += 1
         self.keep_words(keep)
-        
+
     def remove_encoded_images(self, freq=1e3):
         widx = self.vocab.index('ax')
         wc = self.data[:,widx].toarray().squeeze()

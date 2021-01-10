@@ -120,9 +120,9 @@ nValid = int(0.025 * nTrain) # Number of validation samples
 nTest = 200 # Number of testing samples
 tMax = 25 # Maximum number of diffusion times (A^t for t < tMax)
 
-nDataRealizations = 10 # Number of data realizations
-nGraphRealizations = 10 # Number of graph realizations
-nClasses = 5 # Number of source nodes to select
+nDataRealizations = 1 # Number of data realizations
+nGraphRealizations = 1 # Number of graph realizations
+nClasses = 2 # Number of source nodes to select
 
 nNodes = 100 # Number of nodes
 graphOptions = {} # Dictionary of options to pass to the createGraph function
@@ -203,10 +203,6 @@ doSpectralProxies = True
 doEDS = True
 doCoarsening = True
 
-# Select desired architectures
-doSelectionGNN = True
-doAggregationGNN = True
-
 # In this section, we determine the (hyper)parameters of models that we are
 # going to train. This only sets the parameters. The architectures need to be
 # created later below. Do not forget to add the name of the architecture
@@ -229,206 +225,48 @@ modelList = []
 
 # Hyperparameters to be shared by all Selection GNN architectures
 
-if doSelectionGNN:
+modelLocalGNN = {}
+modelLocalGNN['name'] = 'LocalGNN' # To be modified later on depending on the
+    # specific ordering selected
+modelLocalGNN['device'] = 'cuda:0' if (useGPU and torch.cuda.is_available()) \
+                                 else 'cpu'
 
-    #\\\ Basic parameters for all the Selection GNN architectures
+#\\\ ARCHITECTURE
 
-    modelSelGNN = {}
-    modelSelGNN['name'] = 'SelGNN' # To be modified later on depending on the
-        # specific ordering selected
-    modelSelGNN['device'] = 'cuda:0' if (useGPU and torch.cuda.is_available()) \
-                                     else 'cpu'
+# Select architectural nn.Module to use
+modelLocalGNN['archit'] = archit.LocalGNN
+# modelLocalGNN['archit'] = archit.SpectralGNN
+# Graph convolutional layers
+#modelLocalGNN['dimNodeSignals'] = [1, 1, 1, 1] # Number of features per layer
+modelLocalGNN['dimNodeSignals'] = [1, 16, 16, 16] # Number of features per layer
+modelLocalGNN['nFilterTaps'] = [4, 4, 4] # Number of filter taps
+# modelLocalGNN['nCoeff'] = [nNodes, nNodes] # Number of spectral coefficients
+modelLocalGNN['bias'] = True # Include bias
+# Nonlinearity
+modelLocalGNN['nonlinearity'] = nn.ReLU
+# Pooling
+modelLocalGNN['poolingFunction'] = gml.NoPool # Summarizing function
+modelLocalGNN['nSelectedNodes'] = [nNodes, nNodes, nNodes]
+# modelLocalGNN['nSelectedNodes'] = None
+modelLocalGNN['poolingSize'] = [1, 1, 1] # poolingSize-hop neighborhood that
+                                    # is affected by the summary
+# Readout layer
+modelLocalGNN['dimReadout'] = [1]
+# modelLocalGNN['dimLayersMLP'] = [nClasses]
+# Graph Structure
+modelLocalGNN['GSO'] = None # To be determined later on, based on data
+modelLocalGNN['order'] = None
+modelLocalGNN['scalarSummarize'] = True
 
-    #\\\ ARCHITECTURE
+#\\\ TRAINER
 
-    # Select architectural nn.Module to use
-    modelSelGNN['archit'] = archit.SelectionGNN
-    # Graph convolutional layers
-    modelSelGNN['dimNodeSignals'] = [1, 32, 32] # Number of features per layer
-    modelSelGNN['nFilterTaps'] = [5, 5] # Number of filter taps
-    modelSelGNN['bias'] = True # Include bias
-    # Nonlinearity
-    modelSelGNN['nonlinearity'] = nn.ReLU
-    # Pooling
-    modelSelGNN['nSelectedNodes'] = [10, 10] # Number of nodes to keep
-    modelSelGNN['poolingFunction'] = gml.MaxPoolLocal # Summarizing function
-    modelSelGNN['poolingSize'] = [6, 8] # Summarizing neighborhoods
-    # Readout layer
-    modelSelGNN['dimLayersMLP'] = [nClasses]
-    # Graph Structure
-    modelSelGNN['GSO'] = None # To be determined later on, based on data
-    modelSelGNN['order'] = None # To be determined next
-    # Coarsening
-    modelSelGNN['coarsening'] = False
+modelLocalGNN['trainer'] = training.Trainer
 
-    #\\\ TRAINER
+#\\\ EVALUATOR
 
-    modelSelGNN['trainer'] = training.Trainer
+modelLocalGNN['evaluator'] = evaluation.evaluate
 
-    #\\\ EVALUATOR
-
-    modelSelGNN['evaluator'] = evaluation.evaluate
-
-#\\\\\\\\\\\\
-#\\\ MODEL 1: Selection GNN with nodes ordered by degree
-#\\\\\\\\\\\\
-
-if doSelectionGNN and doDegree:
-
-    modelSelGNNdeg = deepcopy(modelSelGNN)
-
-    modelSelGNNdeg['name'] += 'deg' # Name of the architecture
-    # Structure
-    modelSelGNNdeg['order'] = 'Degree'
-
-    #\\\ Save Values:
-    writeVarValues(varsFile, modelSelGNNdeg)
-    modelList += [modelSelGNNdeg['name']]
-
-#\\\\\\\\\\\\
-#\\\ MODEL 2: Selection GNN with nodes ordered by EDS
-#\\\\\\\\\\\\
-
-if doSelectionGNN and doEDS:
-
-    modelSelGNNeds = deepcopy(modelSelGNN)
-
-    modelSelGNNeds['name'] += 'eds' # Name of the architecture
-    # Structure
-    modelSelGNNeds['order'] = 'EDS'
-
-    #\\\ Save Values:
-    writeVarValues(varsFile, modelSelGNNeds)
-    modelList += [modelSelGNNeds['name']]
-
-#\\\\\\\\\\\\
-#\\\ MODEL 3: Selection GNN with nodes ordered by spectral proxies
-#\\\\\\\\\\\\
-
-if doSelectionGNN and doSpectralProxies:
-
-    modelSelGNNspr = deepcopy(modelSelGNN)
-
-    modelSelGNNspr['name'] += 'spr' # Name of the architecture
-    # Structure
-    modelSelGNNspr['order'] = 'SpectralProxies'
-
-    #\\\ Save Values:
-    writeVarValues(varsFile, modelSelGNNspr)
-    modelList += [modelSelGNNspr['name']]
-
-#\\\\\\\\\\\\
-#\\\ MODEL 4: Selection GNN with graph coarsening
-#\\\\\\\\\\\\
-
-if doSelectionGNN and doCoarsening:
-
-    modelSelGNNcrs = deepcopy(modelSelGNN)
-
-    modelSelGNNcrs['name'] += 'crs' # Name of the architecture
-    modelSelGNNcrs['poolingFunction'] = nn.MaxPool1d
-    modelSelGNNcrs['poolingSize'] = [2, 2]
-    modelSelGNNcrs['coarsening'] = True
-
-    #\\\ Save Values:
-    writeVarValues(varsFile, modelSelGNNcrs)
-    modelList += [modelSelGNNcrs['name']]
-
-#\\\\\\\\\\\\\\\\\\\\\\\
-#\\\ AGGREGATION GNN \\\
-#\\\\\\\\\\\\\\\\\\\\\\\
-
-if doAggregationGNN:
-
-    #\\\ Basic parameters for all the Aggregation GNN architectures
-
-    modelAggGNN = {}
-
-    modelAggGNN['name'] = 'AggGNN' # To be modified later on depending on the
-        # specific ordering selected
-    modelAggGNN['device'] = 'cuda:0' if (useGPU and torch.cuda.is_available()) \
-                                     else 'cpu'
-
-    #\\\ ARCHITECTURE
-
-    # Select architectural nn.Module to use
-    modelAggGNN['archit'] = archit.AggregationGNN
-    # Convolutional layers
-    modelAggGNN['dimFeatures'] = [1, 16, 32] # Number of features per layer
-    modelAggGNN['nFilterTaps'] = [4, 8] # Number of filter taps
-    modelAggGNN['bias'] = True # Include bias
-    # Nonlinearity
-    modelAggGNN['nonlinearity'] = nn.ReLU
-    # Pooling
-    modelAggGNN['poolingFunction'] = nn.MaxPool1d # Summarizing function
-    modelAggGNN['poolingSize'] = [2, 2] # Summarizing neighborhoods
-    # Readout layer
-    modelAggGNN['dimLayersMLP'] = [nClasses]
-    # Graph structure
-    modelAggGNN['GSO'] = None # To be determined later on, based on data
-    modelAggGNN['order'] = None # To be determined next
-    # Aggregation sequence
-    modelAggGNN['maxN'] = None # Maximum number of exchanges
-    modelAggGNN['nNodes'] = 1 # Number of nodes on which to obtain the
-        # aggregation sequence
-    modelAggGNN['dimLayersAggMLP'] = [] # If more than one has been used, then
-        # this MLP mixes together the features learned at all the selected nodes
-
-    #\\\ TRAINER
-
-    modelAggGNN['trainer'] = training.Trainer
-
-    #\\\ EVALUATOR
-
-    modelAggGNN['evaluator'] = evaluation.evaluate
-
-#\\\\\\\\\\\\
-#\\\ MODEL 5: Aggregation GNN with node selected by degree
-#\\\\\\\\\\\\
-
-if doAggregationGNN and doDegree:
-
-    modelAggGNNdeg = deepcopy(modelAggGNN)
-
-    modelAggGNNdeg['name'] += 'deg' # Name of the architecture
-    # Structure
-    modelAggGNNdeg['order'] = 'Degree'
-
-    #\\\ Save Values:
-    writeVarValues(varsFile, modelAggGNNdeg)
-    modelList += [modelAggGNNdeg['name']]
-
-#\\\\\\\\\\\\
-#\\\ MODEL 6: Aggregation GNN with node selected by EDS
-#\\\\\\\\\\\\
-
-if doAggregationGNN and doEDS:
-
-    modelAggGNNeds = deepcopy(modelAggGNN)
-
-    modelAggGNNeds['name'] += 'eds' # Name of the architecture
-    # Structure
-    modelAggGNNeds['order'] = 'EDS'
-
-    #\\\ Save Values:
-    writeVarValues(varsFile, modelAggGNNeds)
-    modelList += [modelAggGNNeds['name']]
-
-#\\\\\\\\\\\\
-#\\\ MODEL 7: Aggregation GNN with node selected by spectral proxies
-#\\\\\\\\\\\\
-
-if doAggregationGNN and doSpectralProxies:
-
-    modelAggGNNspr = deepcopy(modelAggGNN)
-
-    modelAggGNNspr['name'] += 'spr' # Name of the architecture
-    # Structure
-    modelAggGNNspr['order'] = 'SpectralProxies'
-
-    #\\\ Save Values:
-    writeVarValues(varsFile, modelAggGNNspr)
-    modelList += [modelAggGNNspr['name']]
+modelList += [modelLocalGNN['name']]
 
 ###########
 # LOGGING #
@@ -676,8 +514,7 @@ for graph in range(nGraphRealizations):
 
         #   Now that we have the list of nodes we are using as sources, then we
         #   can go ahead and generate the datasets.
-        data = Utils.dataTools.SourceLocalization(G, nTrain, nValid, nTest,
-                                                  sourceNodes, tMax = tMax)
+        data = Utils.dataTools.TopologyClassification(G, nTrain, nValid, nTest)
         data.astype(torch.float64)
         #data.to(device)
         data.expandDims() # Data are just graph signals, but the architectures
@@ -781,7 +618,8 @@ for graph in range(nGraphRealizations):
             ########
 
             # Initialize the loss function
-            thisLossFunction = loss.adaptExtraDimensionLoss(lossFunction)
+            #thisLossFunction = loss.adaptExtraDimensionLoss(lossFunction)
+            thisLossFunction = lossFunction()
 
             #########
             # MODEL #
@@ -852,6 +690,59 @@ for graph in range(nGraphRealizations):
                                                        nEpochs,
                                                        batchSize,
                                                        **trainingOptsPerModel[modelName])
+
+            model = modelsGNN[thisModel]
+
+            device = torch.device('cuda:0')
+
+            points_n = 100
+            perm = np.random.permutation(data.pos_points.shape[0])[0:points_n]
+            pos_points = torch.tensor(data.pos_points[perm, :]).unsqueeze(1).to(device)
+            neg_points = torch.tensor(data.neg_points[perm, :]).unsqueeze(1).to(device)
+
+            batch_n = pos_points.shape[0]
+
+            VW = torch.tensor(data.VW).to(device).unsqueeze(0).repeat(batch_n, 1, 1)
+
+            def calc_distinction(pos_proj, neg_proj):
+                # difference = (pos_proj - neg_proj).abs().sum()
+                # total = (pos_proj + neg_proj).abs().sum()
+                difference = (pos_proj.sum(dim=0) - neg_proj.sum(dim=0)).abs()
+                stddevs = torch.cat((pos_proj, neg_proj), dim=0).std(dim=0)
+
+                distinctions = difference / stddevs
+                distinctions[distinctions != distinctions] = 0
+
+                F = distinctions.shape[0]
+
+                return distinctions.sum().item() / F
+
+                #difference = ((pos_proj - neg_proj) ** 2).sum()
+                #total = ((pos_proj + neg_proj) ** 2).sum()
+                #return (difference / total).item()
+
+            distinctions = [calc_distinction(pos_points @ VW, neg_points @ VW)]
+
+            # import pdb; pdb.set_trace()
+
+            sequential_gfl = model.archit.GFL.to(device)
+
+            print(distinctions[0])
+
+            for operation in sequential_gfl:
+                pos_points = operation(pos_points)
+                neg_points = operation(neg_points)
+
+                if not isinstance(operation, gml.NoPool):
+                    pos_proj = pos_points @ VW
+                    neg_proj = neg_points @ VW
+
+                    distinction = calc_distinction(pos_proj, neg_proj)
+                    print(f'{operation}')
+                    print(f'{distinction}')
+                    distinctions.append(distinction)
+
+            print(distinctions)
 
             if doFigs:
             # Find which model to save the results (when having multiple
