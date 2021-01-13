@@ -58,6 +58,8 @@ from Utils.miscTools import saveSeed
 # Start measuring time
 startRunTime = datetime.datetime.now()
 
+# Clear the results file
+open('results.txt', 'w').close()
 
 
 #%%##################################################################
@@ -121,7 +123,7 @@ nTest = 200 # Number of testing samples
 tMax = 25 # Maximum number of diffusion times (A^t for t < tMax)
 
 nDataRealizations = 1 # Number of data realizations
-nGraphRealizations = 1 # Number of graph realizations
+nGraphRealizations = 15 # Number of graph realizations
 nClasses = 2 # Number of source nodes to select
 
 nNodes = 100 # Number of nodes
@@ -691,14 +693,13 @@ for graph in range(nGraphRealizations):
                                                        batchSize,
                                                        **trainingOptsPerModel[modelName])
 
-            model = modelsGNN[thisModel]
-
             device = torch.device('cuda:0')
 
             points_n = 100
-            perm = np.random.permutation(data.pos_points.shape[0])[0:points_n]
-            pos_points = torch.tensor(data.pos_points[perm, :]).unsqueeze(1).to(device)
-            neg_points = torch.tensor(data.neg_points[perm, :]).unsqueeze(1).to(device)
+            perm_pos = np.random.permutation(data.pos_points.shape[0])[0:points_n]
+            perm_neg = np.random.permutation(data.neg_points.shape[0])[0:points_n]
+            pos_points = torch.tensor(data.pos_points[perm_pos, :]).unsqueeze(1).to(device)
+            neg_points = torch.tensor(data.neg_points[perm_neg, :]).unsqueeze(1).to(device)
 
             batch_n = pos_points.shape[0]
 
@@ -725,9 +726,7 @@ for graph in range(nGraphRealizations):
 
             # import pdb; pdb.set_trace()
 
-            sequential_gfl = model.archit.GFL.to(device)
-
-            print(distinctions[0])
+            sequential_gfl = modelsGNN[thisModel].archit.GFL.to(device)
 
             for operation in sequential_gfl:
                 pos_points = operation(pos_points)
@@ -741,6 +740,9 @@ for graph in range(nGraphRealizations):
                     print(f'{operation}')
                     print(f'{distinction}')
                     distinctions.append(distinction)
+
+            with open('results.txt', 'a') as f:
+                f.write(str(distinctions) + '\n')
 
             print(distinctions)
 
