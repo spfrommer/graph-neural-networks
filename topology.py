@@ -123,7 +123,7 @@ nTest = 200 # Number of testing samples
 tMax = 25 # Maximum number of diffusion times (A^t for t < tMax)
 
 nDataRealizations = 1 # Number of data realizations
-nGraphRealizations = 15 # Number of graph realizations
+nGraphRealizations = 20 # Number of graph realizations
 nClasses = 2 # Number of source nodes to select
 
 nNodes = 100 # Number of nodes
@@ -239,8 +239,8 @@ modelLocalGNN['device'] = 'cuda:0' if (useGPU and torch.cuda.is_available()) \
 modelLocalGNN['archit'] = archit.LocalGNN
 # modelLocalGNN['archit'] = archit.SpectralGNN
 # Graph convolutional layers
-#modelLocalGNN['dimNodeSignals'] = [1, 1, 1, 1] # Number of features per layer
-modelLocalGNN['dimNodeSignals'] = [1, 16, 16, 16] # Number of features per layer
+modelLocalGNN['dimNodeSignals'] = [1, 1, 1, 1] # Number of features per layer
+# modelLocalGNN['dimNodeSignals'] = [1, 16, 16, 16] # Number of features per layer
 modelLocalGNN['nFilterTaps'] = [4, 4, 4] # Number of filter taps
 # modelLocalGNN['nCoeff'] = [nNodes, nNodes] # Number of spectral coefficients
 modelLocalGNN['bias'] = True # Include bias
@@ -705,24 +705,46 @@ for graph in range(nGraphRealizations):
 
             VW = torch.tensor(data.VW).to(device).unsqueeze(0).repeat(batch_n, 1, 1)
 
+            def calc_min_cut(pos_proj_point, neg_proj_point):
+                # both are vectors of length points_n
+                # Return of zero is good (perfect classification)
+                pos_proj_point = pos_proj_point.detach().cpu().numpy()
+                neg_proj_point = neg_proj_point.detach().cpu().numpy()
+
+                pos_t = np.vstack((pos_proj_point, np.zeros(points_n)))
+                neg_t = np.vstack((neg_proj_point, np.ones(points_n)))
+
+                tagged = np.hstack((pos_t, neg_t))[:,
+                        np.argsort(np.hstack((pos_proj_point, neg_proj_point)))]
+
+                min_cut = 1000000000
+
+                pos_left, neg_left = 0, 0
+                for tag in tagged[1, :]:
+                    if tag >= 0.5: pos_left += 1
+                    else: neg_left += 1
+
+                    pos_right = points_n - pos_left
+                    neg_right = points_n - neg_left
+
+                    cut_diff = min(pos_left, neg_left) + min(pos_right, neg_right)
+
+                    min_cut = min(min_cut, cut_diff)
+
+                return min_cut
+
+
             def calc_distinction(pos_proj, neg_proj):
-                # difference = (pos_proj - neg_proj).abs().sum()
-                # total = (pos_proj + neg_proj).abs().sum()
-                difference = (pos_proj.sum(dim=0) - neg_proj.sum(dim=0)).abs()
-                stddevs = torch.cat((pos_proj, neg_proj), dim=0).std(dim=0)
+                missclass = 100000000
+                for F in range(pos_proj.shape[1]):
+                    for N in range(pos_proj.shape[2]):
+                        missclass = min(missclass, calc_min_cut(pos_proj[:, F, N],
+                                                                neg_proj[:, F, N]))
 
-                distinctions = difference / stddevs
-                distinctions[distinctions != distinctions] = 0
+                return missclass
 
-                F = distinctions.shape[0]
-
-                return distinctions.sum().item() / F
-
-                #difference = ((pos_proj - neg_proj) ** 2).sum()
-                #total = ((pos_proj + neg_proj) ** 2).sum()
-                #return (difference / total).item()
-
-            distinctions = [calc_distinction(pos_points @ VW, neg_points @ VW)]
+            #distinctions = [calc_distinction(pos_points @ VW, neg_points @ VW)]
+            distinctions = [calc_distinction(pos_points, neg_points)]
 
             # import pdb; pdb.set_trace()
 

@@ -9,7 +9,7 @@ x = np.array([0,1,2,3,4,5,6])
 
 my_xticks = ['Input','Filter','ReLU','Filter','ReLU','Filter','ReLU']
 plt.xticks(x, my_xticks)
-plt.ylabel('Orthogonality')
+plt.ylabel('Separability (0 = perfectly separable, 50 = perfectly inseparable)')
 
 with open('results.txt') as f:
     for line in f:
