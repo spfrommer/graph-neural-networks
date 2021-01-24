@@ -695,7 +695,7 @@ for graph in range(nGraphRealizations):
 
             device = torch.device('cuda:0')
 
-            points_n = 100
+            points_n = 50
             perm_pos = np.random.permutation(data.pos_points.shape[0])[0:points_n]
             perm_neg = np.random.permutation(data.neg_points.shape[0])[0:points_n]
             pos_points = torch.tensor(data.pos_points[perm_pos, :]).unsqueeze(1).to(device)
