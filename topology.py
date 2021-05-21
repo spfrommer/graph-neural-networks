@@ -123,10 +123,39 @@ nTest = 200 # Number of testing samples
 tMax = 25 # Maximum number of diffusion times (A^t for t < tMax)
 
 nDataRealizations = 1 # Number of data realizations
-nGraphRealizations = 20 # Number of graph realizations
+nGraphRealizations = 50 # Number of graph realizations
 nClasses = 2 # Number of source nodes to select
 
-nNodes = 100 # Number of nodes
+
+topology_data = False
+
+if not topology_data:
+    authorName = 'austen'
+    ratioTrain = 0.95 # Ratio of training samples
+    ratioValid = 0.08 # Ratio of validation samples (out of the total training
+    dataPath = os.path.join('datasets','authorshipData','authorshipData.mat')
+    graphNormalizationType = 'rows' # or 'cols' - Makes all rows add up to 1.
+    keepIsolatedNodes = False # If True keeps isolated nodes
+    forceUndirected = True # If True forces the graph to be undirected (symmetrizes)
+    forceConnected = True # If True removes nodes (from lowest to highest degree)
+
+    data = Utils.dataTools.Authorship(authorName,
+                                      ratioTrain,
+                                      ratioValid,
+                                      dataPath,
+                                      graphNormalizationType,
+                                      keepIsolatedNodes,
+                                      forceUndirected,
+                                      forceConnected)
+    nNodes = data.getGraph().shape[0] # Number of nodes
+
+    adjacencyMatrix = data.getGraph()
+    G = graphTools.Graph('adjacency', adjacencyMatrix.shape[0],
+                         {'adjacencyMatrix': adjacencyMatrix})
+    G.S = G.W
+else:
+    nNodes = 100 # Number of nodes
+
 graphOptions = {} # Dictionary of options to pass to the createGraph function
 if graphType == 'SBM':
     graphOptions['nCommunities'] = nClasses # Number of communities
@@ -239,8 +268,8 @@ modelLocalGNN['device'] = 'cuda:0' if (useGPU and torch.cuda.is_available()) \
 modelLocalGNN['archit'] = archit.LocalGNN
 # modelLocalGNN['archit'] = archit.SpectralGNN
 # Graph convolutional layers
-modelLocalGNN['dimNodeSignals'] = [1, 1, 1, 1] # Number of features per layer
-# modelLocalGNN['dimNodeSignals'] = [1, 16, 16, 16] # Number of features per layer
+# modelLocalGNN['dimNodeSignals'] = [1, 1, 1, 1] # Number of features per layer
+modelLocalGNN['dimNodeSignals'] = [1, 16, 16, 16] # Number of features per layer
 modelLocalGNN['nFilterTaps'] = [4, 4, 4] # Number of filter taps
 # modelLocalGNN['nCoeff'] = [nNodes, nNodes] # Number of spectral coefficients
 modelLocalGNN['bias'] = True # Include bias
@@ -479,7 +508,7 @@ for graph in range(nGraphRealizations):
     #                                                                   #
     #####################################################################
 
-    if graphType != 'FacebookEgo':
+    if topology_data or graphType != 'FacebookEgo':
         # If the graph type is the Facebook one, then that graph is fixed,
         # so we don't have to keep changing it.
 
@@ -516,7 +545,10 @@ for graph in range(nGraphRealizations):
 
         #   Now that we have the list of nodes we are using as sources, then we
         #   can go ahead and generate the datasets.
-        data = Utils.dataTools.TopologyClassification(G, nTrain, nValid, nTest)
+
+        if topology_data:
+            data = Utils.dataTools.TopologyClassification(G, nTrain, nValid, nTest)
+
         data.astype(torch.float64)
         #data.to(device)
         data.expandDims() # Data are just graph signals, but the architectures
@@ -695,15 +727,27 @@ for graph in range(nGraphRealizations):
 
             device = torch.device('cuda:0')
 
+            if topology_data:
+                pos_points = data.pos_points
+                neg_points = data.neg_points
+            else:
+                pos_points = data.samples['train']['signals'][0:100].squeeze(1)
+                neg_points = data.samples['train']['signals'][-100:].squeeze(1)
+
             points_n = 50
-            perm_pos = np.random.permutation(data.pos_points.shape[0])[0:points_n]
-            perm_neg = np.random.permutation(data.neg_points.shape[0])[0:points_n]
-            pos_points = torch.tensor(data.pos_points[perm_pos, :]).unsqueeze(1).to(device)
-            neg_points = torch.tensor(data.neg_points[perm_neg, :]).unsqueeze(1).to(device)
+            perm_pos = np.random.permutation(pos_points.shape[0])[0:points_n]
+            perm_neg = np.random.permutation(neg_points.shape[0])[0:points_n]
+            pos_points = torch.tensor(pos_points[perm_pos, :]).unsqueeze(1).to(device)
+            neg_points = torch.tensor(neg_points[perm_neg, :]).unsqueeze(1).to(device)
 
             batch_n = pos_points.shape[0]
 
-            VW = torch.tensor(data.VW).to(device).unsqueeze(0).repeat(batch_n, 1, 1)
+            if topology_data:
+                VW = torch.tensor(data.VW).to(device).unsqueeze(0).repeat(batch_n, 1, 1)
+            else:
+                VW = torch.tensor(G.V).to(device).unsqueeze(0).repeat(batch_n, 1, 1)
+
+            # import pdb; pdb.set_trace()
 
             def calc_min_cut(pos_proj_point, neg_proj_point):
                 # both are vectors of length points_n
@@ -714,13 +758,33 @@ for graph in range(nGraphRealizations):
                 pos_t = np.vstack((pos_proj_point, np.zeros(points_n)))
                 neg_t = np.vstack((neg_proj_point, np.ones(points_n)))
 
-                tagged = np.hstack((pos_t, neg_t))[:,
-                        np.argsort(np.hstack((pos_proj_point, neg_proj_point)))]
+                sort = np.sort(np.hstack((pos_proj_point, neg_proj_point))).tolist()
+
+                indices = np.argsort(np.hstack((pos_proj_point, neg_proj_point)))
+                labels = np.hstack((pos_t, neg_t))[1, indices].tolist()
+
+                ### Preprocess points with same label
+                duplicate_labels = 0
+                i = 1
+                while i < len(labels):
+                    if np.abs(sort[i] - sort[i-1]) < 1e-7 and \
+                       np.abs(labels[i] - labels[i-1]) < 1e-7:
+                        del labels[i-1 : i+1]
+                        del sort[i-1 : i+1]
+
+                        duplicate_labels += 1
+                        if i > 1:
+                            i -= 1
+                    else:
+                        i += 1
+
+                if len(labels) == 0:
+                    return duplicate_labels
 
                 min_cut = 1000000000
 
                 pos_left, neg_left = 0, 0
-                for tag in tagged[1, :]:
+                for tag in labels:
                     if tag >= 0.5: pos_left += 1
                     else: neg_left += 1
 
@@ -731,7 +795,7 @@ for graph in range(nGraphRealizations):
 
                     min_cut = min(min_cut, cut_diff)
 
-                return min_cut
+                return min_cut + duplicate_labels
 
 
             def calc_distinction(pos_proj, neg_proj):
@@ -743,25 +807,40 @@ for graph in range(nGraphRealizations):
 
                 return missclass
 
-            #distinctions = [calc_distinction(pos_points @ VW, neg_points @ VW)]
-            distinctions = [calc_distinction(pos_points, neg_points)]
+            project = True
 
-            # import pdb; pdb.set_trace()
+            if project:
+                distinctions = [calc_distinction(pos_points @ VW, neg_points @ VW)]
+            else:
+                distinctions = [calc_distinction(pos_points, neg_points)]
+
 
             sequential_gfl = modelsGNN[thisModel].archit.GFL.to(device)
 
             for operation in sequential_gfl:
+                # import pdb; pdb.set_trace()
                 pos_points = operation(pos_points)
                 neg_points = operation(neg_points)
+
+                last_distinction = -1
 
                 if not isinstance(operation, gml.NoPool):
                     pos_proj = pos_points @ VW
                     neg_proj = neg_points @ VW
 
-                    distinction = calc_distinction(pos_proj, neg_proj)
+                    if project:
+                        distinction = calc_distinction(pos_proj, neg_proj)
+                    else:
+                        distinction = calc_distinction(pos_points, neg_points)
+
+                    if last_distinction != -1 and distinction != last_distinction and \
+                        'GraphFilter' in str(operation):
+                        import pdb; pdb.set_trace()
+
                     print(f'{operation}')
                     print(f'{distinction}')
                     distinctions.append(distinction)
+                    last_distinction = distinction
 
             with open('results.txt', 'a') as f:
                 f.write(str(distinctions) + '\n')

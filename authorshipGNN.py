@@ -2,10 +2,10 @@
 # Fernando Gama, fgama@seas.upenn.edu
 # Luana Ruiz, rubruiz@seas.upenn.edu
 
-# Test the authorship attribution dataset. The dataset consists on word 
+# Test the authorship attribution dataset. The dataset consists on word
 # adjacency networks (graph support) and word frequency count of short texts
 # (graph signal) for a pool of authors of the 19th century. The word adjacency
-# networks are graphs whose nodes are function words and whose edges are 
+# networks are graphs whose nodes are function words and whose edges are
 # measures of co-occurrence between these words. These graphs are different
 # for each author, but it takes long texts to produce them. In this problem,
 # we will use WANs already created, and try to attribute authorship of short
@@ -15,7 +15,7 @@
 # belongs to the author whose WAN we are using or does not.
 
 # Outputs:
-# - Text file with all the hyperparameters selected for the run and the 
+# - Text file with all the hyperparameters selected for the run and the
 #   corresponding results (hyperparameters.txt)
 # - Pickle file with the random seeds of both torch and numpy for accurate
 #   reproduction of results (randomSeedUsed.pkl)
@@ -73,7 +73,7 @@ startRunTime = datetime.datetime.now()
 authorName = 'austen'
 # jacob 'abbott',         robert louis 'stevenson',   louisa may 'alcott',
 # horatio 'alger',        james 'allen',              jane 'austen',
-# emily 'bronte',         james 'cooper',             charles 'dickens', 
+# emily 'bronte',         james 'cooper',             charles 'dickens',
 # hamlin 'garland',       nathaniel 'hawthorne',      henry 'james',
 # herman 'melville',      'page',                     henry 'thoreau',
 # mark 'twain',           arthur conan 'doyle',       washington 'irving',
@@ -82,7 +82,7 @@ authorName = 'austen'
 thisFilename = 'authorshipGNN' # This is the general name of all related files
 
 saveDirRoot = 'experiments' # In this case, relative location
-saveDir = os.path.join(saveDirRoot, thisFilename + '-' + authorName) 
+saveDir = os.path.join(saveDirRoot, thisFilename + '-' + authorName)
     # Dir where to save all the results from each run
 dataPath = os.path.join('datasets','authorshipData','authorshipData.mat')
 
@@ -92,7 +92,7 @@ today = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
 # Append date and time of the run to the directory, to avoid several runs of
 # overwritting each other.
 saveDir = saveDir + '-' + today
-# Create directory 
+# Create directory
 if not os.path.exists(saveDir):
     os.makedirs(saveDir)
 # Create the file where all the (hyper)parameters and results will be saved.
@@ -201,7 +201,7 @@ writeVarValues(varsFile,
 #################
 
 # Here, there will be three one-layer architectures
-    
+
 doLocalMax = True
 doLocalMed = True
 doPointwse = True
@@ -213,7 +213,7 @@ doPointwse = True
 
 # If the model dictionary is called 'model' + name, then it can be
 # picked up immediately later on, and there's no need to recode anything after
-# the section 'Setup' (except for setting the number of nodes in the 'N' 
+# the section 'Setup' (except for setting the number of nodes in the 'N'
 # variable after it has been coded).
 
 # The name of the keys in the model dictionary have to be the same
@@ -227,16 +227,16 @@ modelList = []
 #\\\\\\\\\\\\\\\\\\\\\
 
 # Hyperparameters to be shared by all architectures
-    
+
 modelActvFn = {}
 
 modelActvFn['name'] = 'ActvFn' # To be modified later on depending on the
     # specific ordering selected
 modelActvFn['device'] = 'cuda:0' if (useGPU and torch.cuda.is_available()) \
                                  else 'cpu'
-                                 
+
 #\\\ ARCHITECTURE
-    
+
 # Select architectural nn.Module to use
 modelActvFn['archit'] = archit.LocalActivationGNN
 # Graph convolutional layers
@@ -269,47 +269,47 @@ modelActvFn['evaluator'] = evaluation.evaluate
 #\\\\\\\\\\\\
 
 if doLocalMax:
-    
+
     #\\\ Basic parameters for all the Aggregation GNN architectures
-    
+
     modelActvFnMax = deepcopy(modelActvFn)
-    
+
     modelActvFnMax['name'] += 'Max'
     # Nonlinearity
     modelActvFnMax['nonlinearity'] = gml.MaxLocalActivation
-    
+
     #\\\ Save Values:
     writeVarValues(varsFile, modelActvFnMax)
     modelList += [modelActvFnMax['name']]
-    
+
 #\\\\\\\\\\\\
 #\\\ MODEL 2: Median Local Activation
 #\\\\\\\\\\\\
 
 if doLocalMed:
-    
+
     #\\\ Basic parameters for all the Aggregation GNN architectures
-    
+
     modelActvFnMed = deepcopy(modelActvFn)
-    
+
     modelActvFnMed['name'] += 'Med'
     # Nonlinearity
     modelActvFnMed['nonlinearity'] = gml.MedianLocalActivation
-    
+
     #\\\ Save Values:
     writeVarValues(varsFile, modelActvFnMed)
     modelList += [modelActvFnMed['name']]
-    
+
 #\\\\\\\\\\\\
 #\\\ MODEL 3: ReLU nonlinearity
 #\\\\\\\\\\\\
 
 if doPointwse:
-    
+
     #\\\ Basic parameters for all the Aggregation GNN architectures
-    
+
     modelActvFnPnt = deepcopy(modelActvFn)
-    
+
     modelActvFnPnt['name'] += 'Pnt'
     # Change the architecture
     modelActvFnPnt['archit'] = archit.SelectionGNN
@@ -317,7 +317,7 @@ if doPointwse:
     modelActvFnPnt['nonlinearity'] = nn.ReLU
     # Get rid of the parameter kHopActivation that we do not need anymore
     modelActvFnPnt.pop('kHopActivation')
-    
+
     #\\\ Save Values:
     writeVarValues(varsFile, modelActvFnPnt)
     modelList += [modelActvFnPnt['name']]
@@ -391,7 +391,7 @@ costLast = {} # Cost for the last model
 for thisModel in modelList: # Create an element for each split realization,
     costBest[thisModel] = [None] * nDataSplits
     costLast[thisModel] = [None] * nDataSplits
-    
+
 if doFigs:
     #\\\ SAVE SPACE:
     # Create the variables to save all the realizations. This is, again, a
@@ -433,7 +433,7 @@ if doLearningRateDecay:
     trainingOptions['learningRateDecayPeriod'] = learningRateDecayPeriod
 trainingOptions['validationInterval'] = validationInterval
 
-# And in case each model has specific training options, then we create a 
+# And in case each model has specific training options, then we create a
 # separate dictionary per model.
 
 trainingOptsPerModel= {}
@@ -458,7 +458,7 @@ for split in range(nDataSplits):
     ############
     # DATASETS #
     ############
-    
+
     if doPrint:
         print("\nLoading data", end = '')
         if nDataSplits > 1:
@@ -474,20 +474,20 @@ for split in range(nDataSplits):
                                       keepIsolatedNodes,
                                       forceUndirected,
                                       forceConnected)
-    
+
     if doPrint:
         print("OK")
 
     #########
     # GRAPH #
     #########
-    
+
     if doPrint:
         print("Setting up the graph...", end = ' ', flush = True)
 
     # Create graph
     adjacencyMatrix = data.getGraph()
-    G = graphTools.Graph('adjacency', adjacencyMatrix.shape[0], 
+    G = graphTools.Graph('adjacency', adjacencyMatrix.shape[0],
                          {'adjacencyMatrix': adjacencyMatrix})
     G.computeGFT() # Compute the GFT of the stored GSO
 
@@ -499,11 +499,11 @@ for split in range(nDataSplits):
     # type to torch and move it to the appropriate device
     data.astype(torch.float64)
     # And the corresponding feature dimension that we will need to use
-    data.expandDims() # Data are just graph signals, but the architectures 
+    data.expandDims() # Data are just graph signals, but the architectures
         # require that the input signals are of the form B x F x N, so we need
         # to expand the middle dimensions to convert them from B x N to
         # B x 1 x N
-    
+
     if doPrint:
         print("OK")
 
@@ -516,19 +516,19 @@ for split in range(nDataSplits):
     # This is the dictionary where we store the models (in a model.Model
     # class, that is then passed to training).
     modelsGNN = {}
-        
+
     # If a new model is to be created, it should be called for here.
-    
+
     if doPrint:
         print("Model initialization...", flush = True)
-        
+
     for thisModel in modelList:
-        
+
         # Get the corresponding parameter dictionary
         modelDict = deepcopy(eval('model' + thisModel))
         # and training options
         trainingOptsPerModel[thisModel] = deepcopy(trainingOptions)
-        
+
         # Now, this dictionary has all the hyperparameters that we need to pass
         # to the architecture function, but it also has other keys that belong
         # to the more general model (like 'name' or 'device'), so we need to
@@ -538,17 +538,17 @@ for split in range(nDataSplits):
         thisDevice = modelDict.pop('device')
         thisTrainer = modelDict.pop('trainer')
         thisEvaluator = modelDict.pop('evaluator')
-        
+
         # If more than one graph or data realization is going to be carried out,
         # we are going to store all of those models separately, so that any of
         # them can be brought back and studied in detail.
         if nDataSplits > 1:
             thisName += 'G%02d' % split
-            
+
         if doPrint:
             print("\tInitializing %s..." % thisName,
                   end = ' ',flush = True)
-            
+
         ##############
         # PARAMETERS #
         ##############
@@ -566,13 +566,13 @@ for split in range(nDataSplits):
         modelDict['GSO'] = S
         # Add the number of nodes for the no-pooling part
         modelDict['nSelectedNodes'] = [nNodes]
-        
+
         ################
         # ARCHITECTURE #
         ################
 
         thisArchit = callArchit(**modelDict)
-        
+
         #############
         # OPTIMIZER #
         #############
@@ -608,7 +608,7 @@ for split in range(nDataSplits):
                                    thisDevice,
                                    thisName,
                                    saveDir)
-        
+
         # Store it
         modelsGNN[thisName] = modelCreated
 
@@ -624,7 +624,7 @@ for split in range(nDataSplits):
 
         if doPrint:
             print("OK")
-            
+
     if doPrint:
         print("Model initialization... COMPLETE")
 
@@ -633,16 +633,16 @@ for split in range(nDataSplits):
     #                    TRAINING                                       #
     #                                                                   #
     #####################################################################
-    
+
     print("")
-    
+
     # We train each model separately
-    
+
     for thisModel in modelsGNN.keys():
-        
+
         if doPrint:
             print("Training model %s..." % thisModel)
-        
+
         # Remember that modelsGNN.keys() has the split numbering as well as the
         # name, while modelList has only the name. So we need to map the
         # specific model for this specific split with the actual model name,
@@ -652,11 +652,11 @@ for split in range(nDataSplits):
         for m in modelList:
             if m in thisModel:
                 modelName = m
-    
+
         # Identify the specific split number at training time
         if nDataSplits > 1:
             trainingOptsPerModel[modelName]['graphNo'] = split
-        
+
         # Train the model
         thisTrainVars = modelsGNN[thisModel].train(data,
                                                    nEpochs,
@@ -670,7 +670,7 @@ for split in range(nDataSplits):
             costTrain[modelName][split] = thisTrainVars['costTrain']
             lossValid[modelName][split] = thisTrainVars['lossValid']
             costValid[modelName][split] = thisTrainVars['costValid']
-                    
+
     # And we also need to save 'nBatches' but is the same for all models, so
     if doFigs:
         nBatches = thisTrainVars['nBatches']
@@ -692,10 +692,10 @@ for split in range(nDataSplits):
         if nDataSplits > 1:
             print(" (Split %02d)" % split, end = '', flush = True)
         print(":", flush = True)
-        
+
 
     for thisModel in modelsGNN.keys():
-        
+
         # Same as before, separate the model name from the data split
         # realization number
         for m in modelList:
@@ -704,11 +704,11 @@ for split in range(nDataSplits):
 
         # Evaluate the model
         thisEvalVars = modelsGNN[thisModel].evaluate(data)
-        
+
         # Save the outputs
         thisCostBest = thisEvalVars['costBest']
         thisCostLast = thisEvalVars['costLast']
-        
+
         # Write values
         writeVarValues(varsFile,
                        {'costBest%s' % thisModel: thisCostBest,
@@ -719,7 +719,7 @@ for split in range(nDataSplits):
         costLast[modelName][split] = thisCostLast
         # This is so that we can later compute a total accuracy with
         # the corresponding error.
-        
+
         if doPrint:
             print("\t%s: %6.2f%% [Best] %6.2f%% [Last]" % (thisModel,
                                                            thisCostBest*100,
@@ -766,7 +766,7 @@ for thisModel in modelList:
                 'stdDevCostBest%s' % thisModel: stdDevCostBest[thisModel],
                 'meanCostLast%s' % thisModel: meanCostLast[thisModel],
                 'stdDevCostLast%s' % thisModel : stdDevCostLast[thisModel]})
-    
+
 # Save the printed info into the .txt file as well
 with open(varsFile, 'a+') as file:
     file.write("Final evaluations (%02d data splits)\n" % (nDataSplits))
@@ -792,7 +792,7 @@ if doFigs and doSaveVars:
     ###################
     # DATA PROCESSING #
     ###################
-    
+
     #\\\ FIGURES DIRECTORY:
     saveDirFigs = os.path.join(saveDir,'figs')
     # If it doesn't exist, create it.
@@ -850,7 +850,7 @@ if doFigs and doSaveVars:
     varsPickle['stdDevCostValid'] = stdDevCostValid
     with open(os.path.join(saveDirFigs,'figVars.pkl'), 'wb') as figVarsFile:
         pickle.dump(varsPickle, figVarsFile)
-        
+
     ########
     # PLOT #
     ########
@@ -962,12 +962,12 @@ if doPrint:
     print("Total time: %dh %dm %.2fs" % (totalRunTimeH,
                                          totalRunTimeM,
                                          totalRunTimeS))
-    
+
 # And save this info into the .txt file as well
 with open(varsFile, 'a+') as file:
-    file.write("Simulation started: %s\n" % 
+    file.write("Simulation started: %s\n" %
                                      startRunTime.strftime("%Y/%m/%d %H:%M:%S"))
-    file.write("Simulation ended:   %s\n" % 
+    file.write("Simulation ended:   %s\n" %
                                        endRunTime.strftime("%Y/%m/%d %H:%M:%S"))
     file.write("Total time: %dh %dm %.2fs" % (totalRunTimeH,
                                               totalRunTimeM,

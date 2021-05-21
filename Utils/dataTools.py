@@ -377,13 +377,16 @@ class TopologyClassification(_dataForClassification):
             angle = np.expand_dims(np.pi * np.random.uniform(0, 2, size=(nTotal)), 1)
 
             points = length * np.concatenate((np.cos(angle), np.sin(angle)), axis=1)
-            points = np.hstack((points, np.zeros((points.shape[0], N - 2))))
+            #points = np.hstack((points, np.zeros((points.shape[0], N - 2))))
+            points = np.hstack((np.zeros((points.shape[0], N - 2)), points))
 
             pos_points = points[np.repeat(length < 0.5, points.shape[1], axis=1)].reshape(-1, N)
             neg_points = points[np.repeat(length > 0.5, points.shape[1], axis=1)].reshape(-1, N)
 
-        pos_points = pos_points @ VW.T + 0.05 * np.random.normal(size=pos_points.shape)
-        neg_points = neg_points @ VW.T + 0.05 * np.random.normal(size=neg_points.shape)
+        # pos_points = pos_points @ VW.T + 0.05 * np.random.normal(size=pos_points.shape)
+        # neg_points = neg_points @ VW.T + 0.05 * np.random.normal(size=neg_points.shape)
+        # pos_points = pos_points @ VW.T
+        # neg_points = neg_points @ VW.T
 
         signals = np.vstack((pos_points, neg_points))
         targets = np.hstack((np.ones((pos_points.shape[0], )),
@@ -950,6 +953,7 @@ class Authorship(_dataForClassification):
         xTest = np.concatenate((xAuthorTest, xRestTest), axis = 0)
         labelsTest = np.concatenate((np.ones(nTestAuthor),
                                      np.zeros(nTestRest)), axis = 0)
+
         # And assign them to the required attribute samples
         self.samples['train']['signals'] = xTrain
         self.samples['train']['targets'] = labelsTrain.astype(np.int)
@@ -957,6 +961,7 @@ class Authorship(_dataForClassification):
         self.samples['valid']['targets'] = labelsValid.astype(np.int)
         self.samples['test']['signals'] = xTest
         self.samples['test']['targets'] = labelsTest.astype(np.int)
+
         # Create graph
         self.createGraph()
         # Change data to specified type and device

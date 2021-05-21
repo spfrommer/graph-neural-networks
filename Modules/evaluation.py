@@ -18,13 +18,13 @@ import pickle
 def evaluate(model, data, **kwargs):
     """
     evaluate: evaluate a model using classification error
-    
+
     Input:
         model (model class): class from Modules.model
         data (data class): a data class from the Utils.dataTools; it needs to
             have a getSamples method and an evaluate method.
         doPrint (optional, bool): if True prints results
-    
+
     Output:
         evalVars (dict): 'errorBest' contains the error rate for the best
             model, and 'errorLast' contains the error rate for the last model
@@ -32,7 +32,7 @@ def evaluate(model, data, **kwargs):
 
     # Get the device we're working on
     device = model.device
-    
+
     if 'doSaveVars' in kwargs.keys():
         doSaveVars = kwargs['doSaveVars']
     else:
@@ -77,7 +77,7 @@ def evaluate(model, data, **kwargs):
     evalVars = {}
     evalVars['costBest'] = costBest.item()
     evalVars['costLast'] = costLast.item()
-    
+
     if doSaveVars:
         saveDirVars = os.path.join(model.saveDir, 'evalVars')
         if not os.path.exists(saveDirVars):
@@ -91,26 +91,26 @@ def evaluate(model, data, **kwargs):
 def evaluateSingleNode(model, data, **kwargs):
     """
     evaluateSingleNode: evaluate a model that has a single node forward
-    
+
     Input:
-        model (model class): class from Modules.model, needs to have a 
+        model (model class): class from Modules.model, needs to have a
             'singleNodeForward' method
         data (data class): a data class from the Utils.dataTools; it needs to
             have a getSamples method and an evaluate method and it also needs to
             have a 'getLabelID' method
         doPrint (optional, bool): if True prints results
-    
+
     Output:
         evalVars (dict): 'errorBest' contains the error rate for the best
             model, and 'errorLast' contains the error rate for the last model
     """
-    
+
     assert 'singleNodeForward' in dir(model.archit)
     assert 'getLabelID' in dir(data)
 
     # Get the device we're working on
     device = model.device
-    
+
     if 'doSaveVars' in kwargs.keys():
         doSaveVars = kwargs['doSaveVars']
     else:
@@ -156,7 +156,7 @@ def evaluateSingleNode(model, data, **kwargs):
     evalVars = {}
     evalVars['costBest'] = costBest.item()
     evalVars['costLast'] = costLast.item()
-    
+
     if doSaveVars:
         saveDirVars = os.path.join(model.saveDir, 'evalVars')
         if not os.path.exists(saveDirVars):
@@ -169,9 +169,9 @@ def evaluateSingleNode(model, data, **kwargs):
 
 def evaluateFlocking(model, data, **kwargs):
     """
-    evaluateClassif: evaluate a model using the flocking cost of velocity 
+    evaluateClassif: evaluate a model using the flocking cost of velocity
         variacne of the team
-    
+
     Input:
         model (model class): class from Modules.model
         data (data class): the data class that generates the flocking data
@@ -179,7 +179,7 @@ def evaluateFlocking(model, data, **kwargs):
         nVideos (optional; int, default: 3): number of videos to save
         graphNo (optional): identify the run with a number
         realizationNo (optional): identify the run with another number
-    
+
     Output:
         evalVars (dict):
             'costBestFull': cost of the best model over the full trajectory
@@ -187,17 +187,17 @@ def evaluateFlocking(model, data, **kwargs):
             'costLastFull': cost of the last model over the full trajectory
             'costLastEnd': cost of the last model at the end of the trajectory
     """
-    
+
     if 'doPrint' in kwargs.keys():
         doPrint = kwargs['doPrint']
     else:
         doPrint = True
-        
+
     if 'nVideos' in kwargs.keys():
         nVideos = kwargs['nVideos']
     else:
         nVideos = 3
-        
+
     if 'graphNo' in kwargs.keys():
         graphNo = kwargs['graphNo']
     else:
@@ -272,10 +272,10 @@ def evaluateFlocking(model, data, **kwargs):
 
     learnedTrajectoriesDir = os.path.join(model.saveDir,
                                           'learnedTrajectories')
-    
+
     if not os.path.exists(learnedTrajectoriesDir):
         os.mkdir(learnedTrajectoriesDir)
-    
+
     if graphNo > -1:
         learnedTrajectoriesDir = os.path.join(learnedTrajectoriesDir,
                                               '%03d' % graphNo)
@@ -318,7 +318,7 @@ def evaluateFlocking(model, data, **kwargs):
     #\\\\\\\\\\\\\\\\\\
     #\\\ EVALUATION \\\
     #\\\\\\\\\\\\\\\\\\
-        
+
     evalVars = {}
     evalVars['costBestFull'] = data.evaluate(vel = velTestBest)
     evalVars['costBestEnd'] = data.evaluate(vel = velTestBest[:,-1:,:,:])
